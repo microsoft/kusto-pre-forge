@@ -1,0 +1,48 @@
+name:  Continuous Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'code/**'
+    branches:
+      - main
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 7.x
+
+    - name: Install dependencies
+      run: dotnet restore code
+    - name: .NET Build Console
+      run: dotnet build code/KustoBlobSplitServer --configuration Release --no-restore
+    - name: Copy binaries
+      run: |
+        mkdir bin
+        cp -r code/KustoBlobSplitServer/bin/Release/net*/* bin
+
+    - name: Azure Login
+      run: az login --service-principal -u ${{ secrets.DEPLOY_CLIENT_ID }} -p ${{ secrets.DEPLOY_SECRET }} --tenant ${{ secrets.TENANT_ID }}
+    - name: Azure Subscription Set
+      run: az account set --name ${{ secrets.SUBSCRIPTION }}
+
+    - name: Retrieve docker registry
+      run: |
+        registry=$(az acr list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].name" -o tsv)
+        echo "Registry:  $registry"
+        echo "registry=$registry" >> $GITHUB_ENV
+
+
+    # See https://learn.microsoft.com/en-us/azure/container-registry/container-registry-quickstart-task-cli
+    - name:  Docker Build / Push workbench
+      run:  |
+        az acr build --image kusto/kusto-split:latest \
+          --registry $registry \
+          --file deployment/docker/Dockerfile bin
