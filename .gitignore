@@ -396,3 +396,9 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+#########################
+#   Custom values
+#########################
+**/Properties/launchSettings.json
+*.local.json
