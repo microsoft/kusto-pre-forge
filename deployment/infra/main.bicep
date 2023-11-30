@@ -162,7 +162,7 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
   }
   properties: {
     adminUserEnabled: true
-    anonymousPullEnabled: false
+    anonymousPullEnabled: true
     dataEndpointEnabled: false
     policies: {
       azureADAuthenticationAsArmPolicy: {
