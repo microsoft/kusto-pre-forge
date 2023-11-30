@@ -11,12 +11,6 @@ param location string = resourceGroup().location
 var prefix = 'kt'
 var suffix = uniqueString(resourceGroup().id)
 
-//  Identity fetching the container images from the registry
-resource containerFetchingIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${prefix}-containerFetchingId-${suffix}'
-  location: location
-}
-
 //  Identity orchestrating, i.e. accessing Kusto + Storage
 resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${prefix}-app-id-${suffix}'
@@ -180,19 +174,6 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
   }
 }
 
-//  Authorize principal to pull container images from the registry (Arc Pull)
-resource containerFetchingRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(containerFetchingIdentity.id, registry.id, 'rbac')
-  scope: registry
-
-  properties: {
-    description: 'Giving AcrPull RBAC to identity'
-    principalId: containerFetchingIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-  }
-}
-
 resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
   name: '${prefix}-app-env-${suffix}'
   location: location
@@ -208,7 +189,6 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
   name: '${prefix}-app-${suffix}'
   location: location
   dependsOn: [
-    containerFetchingRbacAuthorization
     appStorageRbacAuthorization
   ]
   identity: {
