@@ -158,7 +158,7 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
   name: '${prefix}registry${suffix}'
   location: location
   sku: {
-    name: 'Basic'
+    name: 'Standard'
   }
   properties: {
     adminUserEnabled: true
