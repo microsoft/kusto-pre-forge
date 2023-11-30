@@ -214,7 +214,6 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${containerFetchingIdentity.id}': {}
       '${appIdentity.id}': {}
     }
   }
@@ -223,7 +222,6 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
       activeRevisionsMode: 'Single'
       registries: [
         {
-          identity: containerFetchingIdentity.id
           server: registry.properties.loginServer
         }
       ]
