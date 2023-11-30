@@ -220,12 +220,6 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
   properties: {
     configuration: {
       activeRevisionsMode: 'Single'
-      registries: [
-        {
-          server: registry.properties.loginServer
-        }
-      ]
-      secrets: []
     }
     environmentId: appEnvironment.id
     template: {
