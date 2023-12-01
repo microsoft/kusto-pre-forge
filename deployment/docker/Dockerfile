@@ -11,4 +11,4 @@ COPY . .
 ENV TODO ""
 
 #	Run console app
-CMD ["dotnet", "KustoBlobSplitConsole.dll"]
+CMD ["dotnet", "KustoPreForgeConsole.dll"]
