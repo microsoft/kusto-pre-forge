@@ -1,12 +1,7 @@
 name:  Deploy Azure
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - 'deployment/**'
-    branches:
-      - main
+  workflow_dispatch
 
 jobs:
   main:
