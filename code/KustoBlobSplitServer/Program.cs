@@ -1,16 +1,33 @@
 using KustoBlobSplitLib;
 using KustoBlobSplitServiceBus;
 using Microsoft.Extensions.Hosting;
+using System.Reflection;
 
 namespace KustoBlobSplitServer
 {
     public class Program
     {
+        public static string AssemblyVersion
+        {
+            get
+            {
+                var versionAttribute = typeof(Program)
+                    .Assembly
+                    .GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+                var version = versionAttribute == null
+                    ? "<VERSION MISSING>"
+                    : versionAttribute!.InformationalVersion;
+
+                return version;
+            }
+        }
+
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
             var app = builder.Build();
+
+            Console.WriteLine($"Kusto pre-forge {AssemblyVersion}");
 
             // Configure the HTTP request pipeline.
 

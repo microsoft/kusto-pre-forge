@@ -402,3 +402,4 @@ FodyWeavers.xsd
 #########################
 **/Properties/launchSettings.json
 *.local.json
+local
