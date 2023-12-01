@@ -1,0 +1,3 @@
+//  Create landing table
+.create table Raw(Text:string)
+
