@@ -19,6 +19,7 @@ jobs:
       with:
         dotnet-version: 7.x
 
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-restore
     - name: Install dependencies
       run: dotnet restore code
     - name: Patch version
@@ -28,10 +29,6 @@ jobs:
       shell:  bash
       run:  |
         echo "Full version:  ${{ steps.patch-version.outputs.full-version }}"
-    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-restore
-    - name: Install dependencies
-      shell:  bash
-      run: dotnet restore code
     # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build
     - name: .NET Build Console
       run: dotnet build code/KustoBlobSplitServer --configuration Release --no-restore
@@ -55,6 +52,6 @@ jobs:
     # See https://learn.microsoft.com/en-us/azure/container-registry/container-registry-quickstart-task-cli
     - name:  Docker Build / Push container
       run:  |
-        az acr build --image dev/kusto-pre-forge:latest \
+        az acr build --image kusto-pre-forge/dev:latest \
           --registry $registry \
           --file deployment/docker/Dockerfile bin
