@@ -24,18 +24,18 @@ jobs:
       run: dotnet restore code
     - name: Patch version
       id:  patch-version
-      run: python3 deployment/patch-version.py code/KustoBlobSplitConsole/KustoBlobSplitConsole.csproj ${{ github.run_number }}
+      run: python3 deployment/patch-version.py code/KustoPreForgeConsole/KustoPreForgeConsole.csproj ${{ github.run_number }}
     - name:  Output full version
       shell:  bash
       run:  |
         echo "Full version:  ${{ steps.patch-version.outputs.full-version }}"
     # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build
     - name: .NET Build Console
-      run: dotnet build code/KustoBlobSplitConsole --configuration Release --no-restore
+      run: dotnet build code/KustoPreForgeConsole --configuration Release --no-restore
     - name: Copy binaries
       run: |
         mkdir bin
-        cp -r code/KustoBlobSplitConsole/bin/Release/net*/* bin
+        cp -r code/KustoPreForgeConsole/bin/Release/net*/* bin
 
     - name: Azure Login
       run: az login --service-principal -u ${{ secrets.DEPLOY_CLIENT_ID }} -p ${{ secrets.DEPLOY_SECRET }} --tenant ${{ secrets.TENANT_ID }}

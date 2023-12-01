@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.6.33815.320
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitConsole", "KustoBlobSplitConsole\KustoBlobSplitConsole.csproj", "{709FCD58-4BCC-4E83-AB6C-428B8D86DA32}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeLib", "KustoPreForgeLib\KustoPreForgeLib.csproj", "{B8CD0FA5-1636-46C9-810A-68B888FA3370}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitLib", "KustoBlobSplitLib\KustoBlobSplitLib.csproj", "{9A261982-F8E5-43CC-9C5B-9227966EC70B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeServiceBus", "KustoPreForgeServiceBus\KustoPreForgeServiceBus.csproj", "{F42F7610-9744-4905-A01C-C0E6130A1C32}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitServiceBus", "KustoBlobSplitServiceBus\KustoBlobSplitServiceBus.csproj", "{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeConsole", "KustoPreForgeConsole\KustoPreForgeConsole.csproj", "{74617627-873B-4B2C-BC4B-D95B9BF421F9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,18 +15,18 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{709FCD58-4BCC-4E83-AB6C-428B8D86DA32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{709FCD58-4BCC-4E83-AB6C-428B8D86DA32}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{709FCD58-4BCC-4E83-AB6C-428B8D86DA32}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{709FCD58-4BCC-4E83-AB6C-428B8D86DA32}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Release|Any CPU.Build.0 = Release|Any CPU
+		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
