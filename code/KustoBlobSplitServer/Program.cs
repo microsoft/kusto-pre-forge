@@ -24,34 +24,43 @@ namespace KustoBlobSplitServer
 
         public static async Task Main(string[] args)
         {
-            var builder = WebApplication.CreateBuilder(args);
-            var app = builder.Build();
-
-            Console.WriteLine($"Kusto pre-forge {AssemblyVersion}");
-
-            // Configure the HTTP request pipeline.
-
-            app.MapGet("/", (HttpContext httpContext) =>
+            try
             {
-                return string.Empty;
-            });
+                var builder = WebApplication.CreateBuilder(args);
+                var app = builder.Build();
 
-            var webServerTask = app.RunAsync();
-            var runSettings = RunSettings.FromEnvironmentVariables();
-            var context = await RunningContext.CreateAsync(runSettings);
+                Console.WriteLine($"Kusto pre-forge {AssemblyVersion}");
 
-            runSettings.WriteOutSettings();
-            if (string.IsNullOrWhiteSpace(runSettings.ServiceBusQueueUrl))
-            {   //  Run one ETL
-                await EtlRun.RunEtlAsync(context);
+                // Configure the HTTP request pipeline.
+
+                app.MapGet("/", (HttpContext httpContext) =>
+                {
+                    return string.Empty;
+                });
+
+                var webServerTask = app.RunAsync();
+                var runSettings = RunSettings.FromEnvironmentVariables();
+                var context = await RunningContext.CreateAsync(runSettings);
+
+                runSettings.WriteOutSettings();
+                if (string.IsNullOrWhiteSpace(runSettings.ServiceBusQueueUrl))
+                {   //  Run one ETL
+                    await EtlRun.RunEtlAsync(context);
+                }
+                else
+                {   //  Run Service Bus server picking up tasks
+                    await ServiceBusServer.RunServerAsync(
+                        runSettings.ServiceBusQueueUrl,
+                        context);
+                }
+
+                //  Stop web server
+                await Task.WhenAll(app.StopAsync(), webServerTask);
             }
-            else
-            {   //  Run Service Bus server picking up tasks
-                await ServiceBusServer.RunServerAsync(runSettings.ServiceBusQueueUrl, context);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error:  {ex.Message}");
             }
-
-            //  Stop web server
-            await Task.WhenAll(app.StopAsync(), webServerTask);
         }
     }
 }
