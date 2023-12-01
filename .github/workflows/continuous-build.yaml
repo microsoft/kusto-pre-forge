@@ -21,6 +21,18 @@ jobs:
 
     - name: Install dependencies
       run: dotnet restore code
+    - name: Patch version
+      id:  patch-version
+      run: python3 deployment/patch-version.py code/KustoBlobSplitServer/KustoBlobSplitServer.csproj ${{ github.run_number }}
+    - name:  Output full version
+      shell:  bash
+      run:  |
+        echo "Full version:  ${{ steps.patch-version.outputs.full-version }}"
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-restore
+    - name: Install dependencies
+      shell:  bash
+      run: dotnet restore code
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build
     - name: .NET Build Console
       run: dotnet build code/KustoBlobSplitServer --configuration Release --no-restore
     - name: Copy binaries
@@ -41,8 +53,8 @@ jobs:
 
 
     # See https://learn.microsoft.com/en-us/azure/container-registry/container-registry-quickstart-task-cli
-    - name:  Docker Build / Push workbench
+    - name:  Docker Build / Push container
       run:  |
-        az acr build --image kusto/kusto-split:latest \
+        az acr build --image dev/kusto-pre-forge:latest \
           --registry $registry \
           --file deployment/docker/Dockerfile bin
