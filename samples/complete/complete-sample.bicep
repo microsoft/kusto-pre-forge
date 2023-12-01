@@ -24,6 +24,7 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
     enableStreamingIngest: true
   }
 
+  //  Data plane permission:  admin for app 
   resource symbolicname 'principalAssignments' = {
     name: 'string'
     properties: {
@@ -34,11 +35,13 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
     }
   }
 
+  //  Landing database
   resource db 'databases' = {
     name: 'test'
     kind: 'ReadWrite'
     location: location
 
+    //  Script to create landing table
     resource symbolicname 'scripts' = {
       name: 'setup'
       properties: {
@@ -243,7 +246,7 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
             }
             {
               name: 'KustoIngestUri'
-              value: testCluster.properties.uri
+              value: testCluster.properties.dataIngestionUri
             }
             {
               name: 'KustoDb'
