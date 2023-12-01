@@ -7,9 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitConsole", "Ku
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitLib", "KustoBlobSplitLib\KustoBlobSplitLib.csproj", "{9A261982-F8E5-43CC-9C5B-9227966EC70B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitServer", "KustoBlobSplitServer\KustoBlobSplitServer.csproj", "{1D7212D3-1C7B-4486-AF8E-CA6AD93A20EA}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KustoBlobSplitServiceBus", "KustoBlobSplitServiceBus\KustoBlobSplitServiceBus.csproj", "{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoBlobSplitServiceBus", "KustoBlobSplitServiceBus\KustoBlobSplitServiceBus.csproj", "{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,10 +23,6 @@ Global
 		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9A261982-F8E5-43CC-9C5B-9227966EC70B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1D7212D3-1C7B-4486-AF8E-CA6AD93A20EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1D7212D3-1C7B-4486-AF8E-CA6AD93A20EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1D7212D3-1C7B-4486-AF8E-CA6AD93A20EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1D7212D3-1C7B-4486-AF8E-CA6AD93A20EA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7DA8B8DC-50BD-404A-BC3D-A6856E813CF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
