@@ -11,7 +11,7 @@ blobs into smaller chunks to enable faster ingestion.
 
 It is easy to try with the [following ARM template](samples/complete/):
 
-[![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmaster%2Fsamples%2Fcomplete%2Fcomplete-sample.json)
+[![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmain%2Fsamples%2Fcomplete%2Fcomplete-sample.json)
 
 ## Contributing
 
