@@ -2,8 +2,16 @@
 
 ![Data Forge](documentation/assets/pre-forge-logo-small.jpg)
 
-This repo offers a solution to common Kusto pre-processing scenarios.  The first one we tackle is to split large
+This repo offers a solution to common Kusto pre-processing scenarios.
+
+The first one we tackle is to split large
 blobs into smaller chunks to enable faster ingestion.
+
+## Try it!
+
+It is easy to try with the [following ARM template](samples/complete/):
+
+[![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmaster%2Fsamples%2Fcomplete%2Fcomplete-sample.json)
 
 ## Contributing
 
