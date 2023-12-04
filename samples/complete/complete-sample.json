@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.23.1.45101",
-      "templateHash": "13033617804282700032"
+      "templateHash": "9441130990882970617"
     }
   },
   "parameters": {
@@ -77,17 +77,6 @@
     {
       "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
       "apiVersion": "2022-09-01",
-      "name": "[format('{0}/{1}/{2}', format('{0}storage{1}', variables('prefix'), variables('suffix')), 'default', 'dev')]",
-      "properties": {
-        "publicAccess": "None"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', format('{0}storage{1}', variables('prefix'), variables('suffix')), 'default')]"
-      ]
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
-      "apiVersion": "2022-09-01",
       "name": "[format('{0}/{1}/{2}', format('{0}storage{1}', variables('prefix'), variables('suffix')), 'default', 'test')]",
       "properties": {
         "publicAccess": "None"
@@ -121,7 +110,7 @@
           }
         },
         "filter": {
-          "subjectBeginsWith": "/blobServices/default/containers/dev/blobs/landing/",
+          "subjectBeginsWith": "[format('/blobServices/default/containers/{0}/blobs/landing/', 'test')]",
           "includedEventTypes": [
             "Microsoft.Storage.BlobCreated"
           ],
@@ -137,6 +126,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.EventGrid/systemTopics', format('{0}-newBlobTopic-{1}', variables('prefix'), variables('suffix')))]",
         "[resourceId('Microsoft.ServiceBus/namespaces/queues', format('{0}-service-bus-{1}', variables('prefix'), variables('suffix')), 'blob-notification')]",
+        "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', format('{0}storage{1}', variables('prefix'), variables('suffix')), 'default', 'test')]",
         "[extensionResourceId(resourceId('Microsoft.ServiceBus/namespaces/queues', format('{0}-service-bus-{1}', variables('prefix'), variables('suffix')), 'blob-notification'), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.EventGrid/systemTopics', format('{0}-newBlobTopic-{1}', variables('prefix'), variables('suffix'))), resourceId('Microsoft.ServiceBus/namespaces/queues', format('{0}-service-bus-{1}', variables('prefix'), variables('suffix')), 'blob-notification'), 'rbac'))]"
       ]
     },

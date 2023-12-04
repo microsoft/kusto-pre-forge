@@ -85,13 +85,6 @@ resource storage 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   resource blobServices 'blobServices' = {
     name: 'default'
 
-    resource devContainer 'containers' = {
-      name: 'dev'
-      properties: {
-        publicAccess: 'None'
-      }
-    }
-
     resource testContainer 'containers' = {
       name: 'test'
       properties: {
@@ -128,7 +121,7 @@ resource newBlobTopic 'Microsoft.EventGrid/systemTopics@2023-06-01-preview' = {
         }
       }
       filter: {
-        subjectBeginsWith: '/blobServices/default/containers/dev/blobs/landing/'
+        subjectBeginsWith: '/blobServices/default/containers/${storage::blobServices::testContainer.name}/blobs/landing/'
         includedEventTypes: [
           'Microsoft.Storage.BlobCreated'
         ]
