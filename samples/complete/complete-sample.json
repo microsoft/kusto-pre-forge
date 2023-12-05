@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.23.1.45101",
-      "templateHash": "9441130990882970617"
+      "templateHash": "10954442192133450094"
     }
   },
   "parameters": {
@@ -18,7 +18,7 @@
     }
   },
   "variables": {
-    "$fxv#0": "//  Create landing table\r\n.create table Raw(Text:string)\r\n\r\n",
+    "$fxv#0": "//  Create landing table\r\n.create table Landing(Text:string)\r\n\r\n//  Retention on tags\r\n//  It is recommended not to keep too many tags in a table\r\n.alter table Landing policy extent_tags_retention\r\n```\r\n[\r\n\t{\r\n\t\t\"TagPrefix\": \"ingest-by:\",\r\n\t\t\"RetentionPeriod\": \"02:00:00\"\r\n\t},\r\n\t{\r\n\t\t\"TagPrefix\": \"original-blob:\",\r\n\t\t\"RetentionPeriod\": \"04:00:00\"\r\n\t}\r\n]\r\n```\r\n",
     "containerImageLocation": "kustopreforge.azurecr.io/kusto-pre-forge/dev:latest",
     "prefix": "kpf",
     "suffix": "[uniqueString(resourceGroup().id)]"
@@ -306,7 +306,7 @@
                 },
                 {
                   "name": "KustoTable",
-                  "value": "landing"
+                  "value": "Landing"
                 },
                 {
                   "name": "InputCompression",

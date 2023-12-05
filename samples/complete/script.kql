@@ -1,3 +1,18 @@
 //  Create landing table
-.create table Raw(Text:string)
+.create table Landing(Text:string)
 
+//  Retention on tags
+//  It is recommended not to keep too many tags in a table
+.alter table Landing policy extent_tags_retention
+```
+[
+	{
+		"TagPrefix": "ingest-by:",
+		"RetentionPeriod": "02:00:00"
+	},
+	{
+		"TagPrefix": "original-blob:",
+		"RetentionPeriod": "04:00:00"
+	}
+]
+```

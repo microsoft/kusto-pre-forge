@@ -247,7 +247,7 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
             }
             {
               name: 'KustoTable'
-              value: 'landing'
+              value: 'Landing'
             }
             {
               name: 'InputCompression'
