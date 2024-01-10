@@ -1,11 +1,11 @@
 #   Kusto Pre-Forge
 
-![Data Forge](documentation/assets/pre-forge-logo-small.jpg)
+![Data Forge by Microsoft Image Creator](documentation/assets/pre-forge-logo-small.jpg)
 
 This repo offers a solution to common Kusto pre-processing scenarios.
 
 The first one we tackle is to split large
-blobs into smaller chunks to enable faster ingestion.
+blobs into smaller chunks to enable faster ingestion and prevent failure due to time-outs.
 
 ## Try it!
 
@@ -25,9 +25,9 @@ kpf-app-|Container App|Application pointing to the container image `https://kust
 kpfkusto|Azure Data Explorer Cluster|Kusto cluster ingesting the blobs in pieces.
 kpf-app-id-|User Managed Identity|Identity used by the container to access the service bus queue, the storage account and the Kusto cluster.  You can notice the identity has permissions on those resources.
 
-![Sample resources](documentation/assets/sample-overview.png)
+![Sample resources](documentation/assets/complete-sample/sample-overview.png)
 
-You can test the solution by copying a big blob
+You can test the solution by copying a big blob to the storage account's `test` container, in a folder named `landing`.  You should see 
 
 ## Contributing
 
