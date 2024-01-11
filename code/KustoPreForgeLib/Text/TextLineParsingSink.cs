@@ -76,7 +76,7 @@ namespace KustoPreForgeLib.Text
                                 {
                                     //  Init sink task with header
                                     sinkTask = _nextSink.ProcessAsync(
-                                        header,
+                                        toPushFragment.ToArray(),
                                         outputFragmentQueue,
                                         releaseQueue);
                                     //  We release the bytes immediately as they are kept in memory
