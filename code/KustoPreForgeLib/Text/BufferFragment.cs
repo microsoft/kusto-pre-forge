@@ -53,6 +53,22 @@ namespace KustoPreForgeLib.Text
 
         public bool Any() => Length > 0;
 
+        public bool IsContiguouslyBefore(BufferFragment other)
+        {
+            CheckIfSameBuffer(other);
+
+            if (_buffer.Length != 0)
+            {
+                var end = (_offset + Length) % _buffer.Length;
+
+                return end == other._offset;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
         public IEnumerable<Memory<byte>> GetMemoryBlocks()
         {
             if (_offset + Length <= _buffer.Length)
@@ -72,6 +88,38 @@ namespace KustoPreForgeLib.Text
         }
 
         #region Merge
+        public BufferFragment? TryMerge(BufferFragment other)
+        {
+            if (Length == 0)
+            {
+                return other;
+            }
+            else if (other.Length == 0)
+            {
+                return this;
+            }
+            else
+            {
+                CheckIfSameBuffer(other);
+
+                var end = (_offset + Length) % _buffer.Length;
+                var otherEnd = (other._offset + other.Length) % _buffer.Length;
+
+                if (end == other._offset)
+                {
+                    return new BufferFragment(_buffer, _offset, Length + other.Length);
+                }
+                else if (otherEnd == _offset)
+                {
+                    return new BufferFragment(_buffer, other._offset, Length + other.Length);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+        }
+
         public BufferFragment Merge(BufferFragment other)
         {
             var mergedFragment = TryMerge(other);
@@ -116,41 +164,6 @@ namespace KustoPreForgeLib.Text
             while (indexToRemove.Any() && list.Any());
 
             return (mergedFragment, list.ToImmutableArray());
-        }
-
-        private BufferFragment? TryMerge(BufferFragment other)
-        {
-            if (Length == 0)
-            {
-                return other;
-            }
-            else if (other.Length == 0)
-            {
-                return this;
-            }
-            else
-            {
-                if (!object.ReferenceEquals(_buffer, other._buffer))
-                {
-                    throw new ArgumentException(nameof(other), "Not related to same buffer");
-                }
-
-                var end = (_offset + Length) % _buffer.Length;
-                var otherEnd = (other._offset + other.Length) % _buffer.Length;
-
-                if (end == other._offset)
-                {
-                    return new BufferFragment(_buffer, _offset, Length + other.Length);
-                }
-                else if (otherEnd == _offset)
-                {
-                    return new BufferFragment(_buffer, other._offset, Length + other.Length);
-                }
-                else
-                {
-                    return null;
-                }
-            }
         }
         #endregion
 
@@ -221,5 +234,13 @@ namespace KustoPreForgeLib.Text
             return ((IEnumerable<byte>)this).GetEnumerator();
         }
         #endregion
+
+        private void CheckIfSameBuffer(BufferFragment other)
+        {
+            if (!object.ReferenceEquals(_buffer, other._buffer))
+            {
+                throw new ArgumentException(nameof(other), "Not related to same buffer");
+            }
+        }
     }
 }

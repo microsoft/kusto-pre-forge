@@ -54,6 +54,7 @@ namespace KustoPreForgeLib.LineBased
                 null,
                 fragmentQueue,
                 releaseQueue));
+            var lastFragment = (BufferFragment?)null;
 
             Console.WriteLine($"Reading '{_sourceBlob.Uri}'");
             using (var readStream = await _sourceBlob.OpenReadAsync(readOptions))
@@ -96,8 +97,18 @@ namespace KustoPreForgeLib.LineBased
 
                         var bundle = bufferAvailable.TryMerge(fragmentList);
 
-                        bufferAvailable = bundle.Fragment;
-                        fragmentList = bundle.List;
+                        if (lastFragment == null
+                            //  Make sure we merge a fragment that is contiguous with last one
+                            || lastFragment.IsContiguouslyBefore(bundle.Fragment))
+                        {
+                            bufferAvailable = bundle.Fragment;
+                            fragmentList = bundle.List;
+                        }
+                        else
+                        {
+                            int a = 5;
+                            ++a;
+                        }
                     }
                 }
             }
