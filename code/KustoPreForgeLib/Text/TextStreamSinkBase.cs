@@ -18,6 +18,11 @@ namespace KustoPreForgeLib.LineBased
 
         public TextStreamSinkBase(RunningContext context, string shardId)
         {
+            if (context.SourceBlobClient == null)
+            {
+                throw new ArgumentNullException(nameof(context.SourceBlobClient));
+            }
+
             Context = context;
             ShardId = shardId;
         }
@@ -66,7 +71,7 @@ namespace KustoPreForgeLib.LineBased
         }
 
         protected abstract Task<Stream> CreateOutputStreamAsync();
-        
+
         protected abstract Task PostWriteAsync();
 
         protected string GetCompressionExtension()

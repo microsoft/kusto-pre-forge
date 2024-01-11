@@ -45,7 +45,7 @@ namespace KustoPreForgeLib.LineBased
         protected override async Task PostWriteAsync()
         {
             var properties = Context.CreateIngestionProperties();
-            var tagValue = $"{Context.SourceBlobClient.Uri}-{ShardId}";
+            var tagValue = $"{Context.SourceBlobClient!.Uri}-{ShardId}";
 
             properties.IngestByTags = new[] { tagValue };
             properties.IngestIfNotExists = new[] { tagValue };

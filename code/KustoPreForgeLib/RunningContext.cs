@@ -28,7 +28,9 @@ namespace KustoPreForgeLib
         {
             var blobSettings = runSettings.BlobSettings;
             var credentials = GetCredentials(runSettings);
-            var sourceBlobClient = new BlockBlobClient(runSettings.SourceBlob, credentials);
+            var sourceBlobClient = runSettings.SourceBlob != null
+                ? new BlockBlobClient(runSettings.SourceBlob, credentials)
+                : null;
             var destinationBlobClient = runSettings.DestinationBlobPrefix != null
                 ? new BlockBlobClient(runSettings.DestinationBlobPrefix, credentials)
                 : null;
@@ -69,7 +71,7 @@ namespace KustoPreForgeLib
         public RunningContext(
             BlobSettings blobSettings,
             TokenCredential credentials,
-            BlockBlobClient sourceBlobClient,
+            BlockBlobClient? sourceBlobClient,
             BlockBlobClient? destinationBlobClient,
             IKustoQueuedIngestClient? ingestClient,
             Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory,
@@ -121,7 +123,7 @@ namespace KustoPreForgeLib
 
         public TokenCredential Credentials { get; }
 
-        public BlockBlobClient SourceBlobClient { get; }
+        public BlockBlobClient? SourceBlobClient { get; }
 
         public BlockBlobClient? DestinationBlobClient { get; }
 

@@ -22,7 +22,7 @@ namespace KustoPreForgeLib
 
         public string? KustoTable { get; }
 
-        public Uri SourceBlob { get; }
+        public Uri? SourceBlob { get; }
 
         public Uri? DestinationBlobPrefix { get; }
 
@@ -35,7 +35,7 @@ namespace KustoPreForgeLib
             var authMode = GetEnum<AuthMode>("AuthMode", false);
             var managedIdentityResourceId = GetString("ManagedIdentityResourceId", false);
             var serviceBusQueueUrl = GetString("ServiceBusQueueUrl", false);
-            var sourceBlob = GetUri("SourceBlob");
+            var sourceBlob = GetUri("SourceBlob", false);
             var destinationBlobPrefix = GetUri("DestinationBlobPrefix", false);
             var kustoIngestUri = GetUri("KustoIngestUri", false);
             var kustoDb = GetString("KustoDb", false);
@@ -70,10 +70,15 @@ namespace KustoPreForgeLib
             Uri? kustoIngestUri,
             string? kustoDb,
             string? kustoTable,
-            Uri sourceBlob,
+            Uri? sourceBlob,
             Uri? destinationBlobPrefix,
             BlobSettings blobSettings)
         {
+            if (serviceBusQueueUrl == null && sourceBlob == null)
+            {
+                throw new ArgumentNullException(
+                    $"Either {serviceBusQueueUrl} or {sourceBlob} must be specified");
+            }
             if (kustoIngestUri != null)
             {
                 if (kustoDb == null || kustoTable == null)

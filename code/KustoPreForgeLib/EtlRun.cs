@@ -14,6 +14,11 @@ namespace KustoPreForgeLib
     {
         public static async Task RunEtlAsync(RunningContext context)
         {
+            if (context.SourceBlobClient == null)
+            {
+                throw new ArgumentNullException(nameof(context.SourceBlobClient));
+            }
+
             var stopwatch = new Stopwatch();
 
             stopwatch.Start();
@@ -36,7 +41,7 @@ namespace KustoPreForgeLib
                             splitSink,
                             context.BlobSettings.HasHeaders);
                         var source = new TextSource(
-                            context.SourceBlobClient,
+                            context.SourceBlobClient!,
                             context.BlobSettings.InputCompression,
                             parsingSink);
 
