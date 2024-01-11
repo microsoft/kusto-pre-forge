@@ -106,11 +106,6 @@ namespace KustoPreForgeLib.LineBased
                             fragmentList = bundle.List;
                             lastFragment = null;
                         }
-                        else
-                        {
-                            int a = 5;
-                            ++a;
-                        }
                     }
                 }
             }
