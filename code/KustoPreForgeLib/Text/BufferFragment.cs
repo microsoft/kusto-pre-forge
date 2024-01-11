@@ -74,6 +74,52 @@ namespace KustoPreForgeLib.Text
         #region Merge
         public BufferFragment Merge(BufferFragment other)
         {
+            var mergedFragment = TryMerge(other);
+
+            if (mergedFragment != null)
+            {
+                return mergedFragment;
+            }
+            else
+            {
+                throw new ArgumentException(nameof(other), "Not contiguous");
+            }
+        }
+
+        public (BufferFragment Fragment, IImmutableList<BufferFragment> List) TryMerge(
+            IEnumerable<BufferFragment> others)
+        {
+            var list = new List<BufferFragment>(others);
+            var indexToRemove = new List<int>(list.Count);
+            var mergedFragment = this;
+
+            do
+            {
+                indexToRemove.Clear();
+
+                for (int i = 0; i != list.Count; ++i)
+                {
+                    var other = list[i];
+                    var tryMergedFragment = mergedFragment.TryMerge(other);
+
+                    if (tryMergedFragment != null)
+                    {
+                        mergedFragment = mergedFragment.Merge(other);
+                        indexToRemove.Add(i);
+                    }
+                }
+                foreach (var i in indexToRemove.Reverse<int>())
+                {
+                    list.RemoveAt(i);
+                }
+            }
+            while (indexToRemove.Any() && list.Any());
+
+            return (mergedFragment, list.ToImmutableArray());
+        }
+
+        private BufferFragment? TryMerge(BufferFragment other)
+        {
             if (Length == 0)
             {
                 return other;
@@ -102,42 +148,9 @@ namespace KustoPreForgeLib.Text
                 }
                 else
                 {
-                    throw new ArgumentException(nameof(other), "Not contiguous");
+                    return null;
                 }
             }
-        }
-
-        public (BufferFragment Fragment, IImmutableList<BufferFragment> List) TryMerge(
-            IEnumerable<BufferFragment> others)
-        {
-            var list = new List<BufferFragment>(others);
-            var indexToRemove = new List<int>(list.Count);
-            var mergedFragment = this;
-
-            do
-            {
-                indexToRemove.Clear();
-
-                for (int i = 0; i != list.Count; ++i)
-                {
-                    var other = list[i];
-                    var end = (mergedFragment._offset + mergedFragment.Length) % _buffer.Length;
-                    var otherEnd = (other._offset + other.Length) % _buffer.Length;
-
-                    if (end == other._offset || otherEnd == _offset)
-                    {
-                        mergedFragment = mergedFragment.Merge(other);
-                        indexToRemove.Add(i);
-                    }
-                }
-                foreach (var i in indexToRemove.Reverse<int>())
-                {
-                    list.RemoveAt(i);
-                }
-            }
-            while (indexToRemove.Any() && list.Any());
-
-            return (mergedFragment, list.ToImmutableArray());
         }
         #endregion
 
