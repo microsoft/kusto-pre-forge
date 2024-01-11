@@ -76,9 +76,10 @@ namespace KustoPreForgeLib.LineBased
                         }
                         else
                         {
-                            var currentBuffer = bufferAvailable.SpliceBefore(readLength);
+                            var currentFragment = bufferAvailable.SpliceBefore(readLength);
 
-                            fragmentQueue.Enqueue(currentBuffer);
+                            fragmentQueue.Enqueue(currentFragment);
+                            lastFragment = currentFragment;
                             bufferAvailable = bufferAvailable.SpliceAfter(readLength - 1);
                         }
                     }
@@ -103,6 +104,7 @@ namespace KustoPreForgeLib.LineBased
                         {
                             bufferAvailable = bundle.Fragment;
                             fragmentList = bundle.List;
+                            lastFragment = null;
                         }
                         else
                         {
