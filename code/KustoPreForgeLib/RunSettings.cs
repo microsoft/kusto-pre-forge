@@ -74,9 +74,12 @@ namespace KustoPreForgeLib
             Uri? destinationBlobPrefix,
             BlobSettings blobSettings)
         {
-            if (kustoIngestUri != null && (kustoDb == null || kustoTable == null))
+            if (kustoIngestUri != null)
             {
-                throw new ArgumentNullException(nameof(kustoDb));
+                if (kustoDb == null || kustoTable == null)
+                {
+                    throw new ArgumentNullException(nameof(kustoDb));
+                }
             }
             else if (destinationBlobPrefix == null)
             {
