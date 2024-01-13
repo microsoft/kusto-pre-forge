@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.23.1.45101",
-      "templateHash": "18256363568938254274"
+      "version": "0.24.24.22086",
+      "templateHash": "1562826218297951044"
     }
   },
   "parameters": {
@@ -55,7 +55,7 @@
             "value": "[format('{0}storage{1}', variables('prefix'), variables('suffix'))]"
           },
           "storageContainerName": {
-            "value": "test"
+            "value": "landing"
           },
           "eventGridTopicName": {
             "value": "[format('{0}-newBlobTopic-{1}', variables('prefix'), variables('suffix'))]"
@@ -76,8 +76,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.23.1.45101",
-              "templateHash": "14512016444776962702"
+              "version": "0.24.24.22086",
+              "templateHash": "16043367885066835842"
             }
           },
           "parameters": {
@@ -246,7 +246,7 @@
                   }
                 },
                 "filter": {
-                  "subjectBeginsWith": "[format('/blobServices/default/containers/{0}/blobs/landing/', parameters('storageContainerName'))]",
+                  "subjectBeginsWith": "[format('/blobServices/default/containers/{0}/blobs/', parameters('storageContainerName'))]",
                   "includedEventTypes": [
                     "Microsoft.Storage.BlobCreated"
                   ],
