@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.24.24.22086",
-      "templateHash": "16656466679212356710"
+      "templateHash": "2318115522761387770"
     }
   },
   "parameters": {
@@ -346,7 +346,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.24.24.22086",
-              "templateHash": "13784056294662312224"
+              "templateHash": "15518286004137861524"
             }
           },
           "parameters": {
@@ -475,7 +475,7 @@
             {
               "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
               "apiVersion": "2023-06-01-preview",
-              "name": "[parameters('eventGridSubscriptionName')]",
+              "name": "[format('{0}/{1}', parameters('eventGridTopicName'), parameters('eventGridSubscriptionName'))]",
               "properties": {
                 "deliveryWithResourceIdentity": {
                   "destination": {
