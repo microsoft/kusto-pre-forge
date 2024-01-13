@@ -29,7 +29,7 @@ module storage '../../templates/storage.bicep' = {
 }
 
 module folderHandle '../../templates/folder-handler.bicep' = [for case in testCases: {
-  name: '${deployment().name}-folder-handler'
+  name: '${deployment().name}-${case.name}'
   dependsOn: [
     cluster
     storage
