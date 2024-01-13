@@ -3,6 +3,11 @@ param location string = resourceGroup().location
 
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
+var testCases = [
+  {
+    name: 'text'
+  }
+]
 
 module cluster '../../templates/cluster.bicep' = {
   name: '${deployment().name}-cluster'
@@ -19,12 +24,11 @@ module storage '../../templates/storage.bicep' = {
     location: location
     storageAccountName: '${prefix}storage${suffix}'
     storageContainerName: 'landing'
-    eventGridTopicName:'${prefix}-newBlobTopic-${suffix}'
+    eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
   }
 }
 
-/*
-module folderHandle '../../templates/folder-handler.bicep' = {
+module folderHandle '../../templates/folder-handler.bicep' = [for case in testCases: {
   name: '${deployment().name}-folder-handler'
   dependsOn: [
     cluster
@@ -35,14 +39,16 @@ module folderHandle '../../templates/folder-handler.bicep' = {
     appIdentityName: '${prefix}-app-id-${suffix}'
     kustoClusterName: '${prefix}kusto${suffix}'
     kustoDbName: 'test'
+    //  Kusto Table ???
     serviceBusName: '${prefix}-service-bus-${suffix}'
-    serviceBusQueueName: 'blob-notification'
+    serviceBusQueueName: case.name
     storageAccountName: '${prefix}storage${suffix}'
     storageContainerName: 'landing'
-    eventGridTopicName:'${prefix}-newBlobTopic-${suffix}'
-    eventGridSubscriptionName:'toServiceBus'
-    appEnvironmentName:'${prefix}-app-env-${suffix}'
-    appName:'${prefix}-app-${suffix}'
+    eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
+    //  Storage folder
+    eventGridSubscriptionName: 'toServiceBus'
+    appEnvironmentName: '${prefix}-app-env-${suffix}'
+    appName: '${prefix}-app-${suffix}-${case.name}'
   }
 }
-*/
+]
