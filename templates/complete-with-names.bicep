@@ -34,12 +34,6 @@ param appEnvironmentName string
 @description('Name of App')
 param appName string
 
-//  Identity orchestrating, i.e. accessing Kusto + Storage
-resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: appIdentityName
-  location: location
-}
-
 module cluster 'cluster.bicep' = {
   name: '${deployment().name}-cluster'
   params: {

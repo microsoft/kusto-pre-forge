@@ -17,5 +17,5 @@ jobs:
     - name: Deploy infra
       run: |
         cd deployment/infra
-        bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }} ${{ secrets.KUSTO_INGEST_URI }} ${{ secrets.KUSTO_DB }} ${{ secrets.KUSTO_TABLE }}
+        bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }}
 
