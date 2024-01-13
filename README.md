@@ -9,7 +9,7 @@ blobs into smaller chunks to enable faster ingestion and prevent failure due to 
 
 ## Try it!
 
-It is easy to try with the [following ARM template](samples/complete/):
+It is easy to try with the [following ARM template](templates/complete-sample.bicep):
 
 [![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmain%2Ftemplates%2Fcomplete-sample.json)
 
