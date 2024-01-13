@@ -9,9 +9,11 @@ blobs into smaller chunks to enable faster ingestion and prevent failure due to 
 
 ## Try it!
 
-It is easy to try with the [following ARM template](samples/complete/):
+It is easy to try with the [following ARM template](templates/complete-sample.bicep):
 
-[![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmain%2Fsamples%2Fcomplete%2Fcomplete-sample.json)
+[![Deploy button](http://azuredeploy.net/deploybutton.png)](https://portal.azure.com/#create/Microsoft.Template/uri/https:%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fkusto-pre-forge%2Fmain%2Ftemplates%2Fcomplete-sample.json)
+
+(Click [here](templates/) to see variations of this template offering different levels of control)
 
 This template deploys the following resources (you will notice each resource has the same suffix which makes the resource name unique):
 
@@ -27,7 +29,7 @@ kpf-app-id-|User Managed Identity|Identity used by the container to access the s
 
 ![Sample resources](documentation/assets/complete-sample/sample-overview.png)
 
-You can test the solution by copying a big blob to the storage account's `test` container, in a folder named `landing`.  You should see 
+You can test the solution by copying a big blob to the storage account's `landing` container.  You should see (TODO) 
 
 ## Contributing
 
