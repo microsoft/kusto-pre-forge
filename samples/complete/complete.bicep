@@ -261,14 +261,6 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
               value: appIdentity.id
             }
             {
-              name: 'SourceBlob'
-              value: 'https://${storage.name}.blob.core.windows.net/dev/adx.gz'
-            }
-            {
-              name: 'DestinationBlobPrefix'
-              value: 'https://${storage.name}.blob.core.windows.net/dev/split/'
-            }
-            {
               name: 'KustoIngestUri'
               value: testCluster.properties.dataIngestionUri
             }
