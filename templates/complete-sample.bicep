@@ -1,11 +1,10 @@
 @description('Location for all resources')
 param location string = resourceGroup().location
 
-var containerImageLocation = 'kustopreforge.azurecr.io/kusto-pre-forge/dev:latest'
 var prefix = 'kpf'
 var suffix = uniqueString(resourceGroup().id)
 
-module coreModule 'complete.bicep' = {
+module coreModule 'complete-with-names.bicep' = {
   name: '${deployment().name}-core'
   params: {
     location: location
