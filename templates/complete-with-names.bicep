@@ -50,7 +50,7 @@ module cluster 'cluster.bicep' = {
 }
 
 module storage 'storage.bicep' = {
-  name: '${deployment().name}-cluster'
+  name: '${deployment().name}-storage'
   params: {
     location: location
     storageAccountName: storageAccountName
