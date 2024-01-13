@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.24.24.22086",
-      "templateHash": "5536367617616528622"
+      "templateHash": "17194573789232760684"
     }
   },
   "parameters": {
@@ -83,67 +83,7 @@
       }
     }
   },
-  "variables": {
-    "$fxv#0": "//  Create landing table\r\n.create table Landing(Text:string)\r\n\r\n//  Retention on tags\r\n//  It is recommended not to keep too many tags in a table\r\n.alter table Landing policy extent_tags_retention\r\n```\r\n[\r\n\t{\r\n\t\t\"TagPrefix\": \"ingest-by:\",\r\n\t\t\"RetentionPeriod\": \"02:00:00\"\r\n\t},\r\n\t{\r\n\t\t\"TagPrefix\": \"original-blob:\",\r\n\t\t\"RetentionPeriod\": \"04:00:00\"\r\n\t}\r\n]\r\n```\r\n",
-    "containerImageLocation": "kustopreforge.azurecr.io/kusto-pre-forge/dev:latest"
-  },
   "resources": [
-    {
-      "type": "Microsoft.Kusto/clusters/databases/scripts",
-      "apiVersion": "2023-05-02",
-      "name": "[format('{0}/{1}/{2}', parameters('kustoClusterName'), parameters('kustoDbName'), 'setup')]",
-      "properties": {
-        "continueOnErrors": false,
-        "scriptContent": "[variables('$fxv#0')]"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Kusto/clusters/databases', parameters('kustoClusterName'), parameters('kustoDbName'))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Kusto/clusters/databases/principalAssignments",
-      "apiVersion": "2023-05-02",
-      "name": "[format('{0}/{1}/{2}', parameters('kustoClusterName'), parameters('kustoDbName'), 'string')]",
-      "properties": {
-        "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('appIdentityName')), '2023-01-31').principalId]",
-        "principalType": "App",
-        "role": "Ingestor",
-        "tenantId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('appIdentityName')), '2023-01-31').tenantId]"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('appIdentityName'))]",
-        "[resourceId('Microsoft.Kusto/clusters/databases', parameters('kustoClusterName'), parameters('kustoDbName'))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Kusto/clusters/databases",
-      "apiVersion": "2023-05-02",
-      "name": "[format('{0}/{1}', parameters('kustoClusterName'), parameters('kustoDbName'))]",
-      "kind": "ReadWrite",
-      "location": "[parameters('location')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Kusto/clusters', parameters('kustoClusterName'))]"
-      ]
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
-      "apiVersion": "2022-09-01",
-      "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', parameters('storageContainerName'))]",
-      "properties": {
-        "publicAccess": "None"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
-      ]
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts/blobServices",
-      "apiVersion": "2022-09-01",
-      "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
-      "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
-      ]
-    },
     {
       "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
       "apiVersion": "2023-01-31",
@@ -151,47 +91,212 @@
       "location": "[parameters('location')]"
     },
     {
-      "type": "Microsoft.Kusto/clusters",
-      "apiVersion": "2023-05-02",
-      "name": "[parameters('kustoClusterName')]",
-      "location": "[parameters('location')]",
-      "sku": {
-        "name": "Dev(No SLA)_Standard_E2a_v4",
-        "tier": "Basic",
-        "capacity": 1
-      },
-      "properties": {
-        "enableStreamingIngest": true
-      }
-    },
-    {
-      "type": "Microsoft.Storage/storageAccounts",
+      "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[parameters('storageAccountName')]",
-      "location": "[parameters('location')]",
-      "sku": {
-        "name": "Standard_LRS"
-      },
-      "kind": "StorageV2",
+      "name": "[format('{0}-cluster', deployment().name)]",
       "properties": {
-        "isHnsEnabled": true
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "kustoClusterName": {
+            "value": "[parameters('kustoClusterName')]"
+          },
+          "kustoDbName": {
+            "value": "[parameters('kustoDbName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.24.24.22086",
+              "templateHash": "3701124960274593160"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "kustoClusterName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Kusto Cluster"
+              }
+            },
+            "kustoDbName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Kusto database"
+              }
+            }
+          },
+          "variables": {
+            "$fxv#0": "//  Create landing table\r\n.create table Landing(Text:string)\r\n\r\n//  Retention on tags\r\n//  It is recommended not to keep too many tags in a table\r\n.alter table Landing policy extent_tags_retention\r\n```\r\n[\r\n\t{\r\n\t\t\"TagPrefix\": \"ingest-by:\",\r\n\t\t\"RetentionPeriod\": \"02:00:00\"\r\n\t},\r\n\t{\r\n\t\t\"TagPrefix\": \"original-blob:\",\r\n\t\t\"RetentionPeriod\": \"04:00:00\"\r\n\t}\r\n]\r\n```\r\n"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Kusto/clusters/databases/scripts",
+              "apiVersion": "2023-05-02",
+              "name": "[format('{0}/{1}/{2}', parameters('kustoClusterName'), parameters('kustoDbName'), 'setup')]",
+              "properties": {
+                "continueOnErrors": false,
+                "scriptContent": "[variables('$fxv#0')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Kusto/clusters/databases', parameters('kustoClusterName'), parameters('kustoDbName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Kusto/clusters/databases",
+              "apiVersion": "2023-05-02",
+              "name": "[format('{0}/{1}', parameters('kustoClusterName'), parameters('kustoDbName'))]",
+              "kind": "ReadWrite",
+              "location": "[parameters('location')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Kusto/clusters', parameters('kustoClusterName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Kusto/clusters",
+              "apiVersion": "2023-05-02",
+              "name": "[parameters('kustoClusterName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Dev(No SLA)_Standard_E2a_v4",
+                "tier": "Basic",
+                "capacity": 1
+              },
+              "properties": {
+                "enableStreamingIngest": true
+              }
+            }
+          ]
+        }
       }
     },
     {
-      "type": "Microsoft.EventGrid/systemTopics",
-      "apiVersion": "2023-06-01-preview",
-      "name": "[parameters('eventGridTopicName')]",
-      "location": "[parameters('location')]",
-      "identity": {
-        "type": "SystemAssigned"
-      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('{0}-cluster', deployment().name)]",
       "properties": {
-        "source": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
-        "topicType": "Microsoft.Storage.StorageAccounts"
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
-      ]
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "storageAccountName": {
+            "value": "[parameters('storageAccountName')]"
+          },
+          "storageContainerName": {
+            "value": "[parameters('storageContainerName')]"
+          },
+          "eventGridTopicName": {
+            "value": "[parameters('eventGridTopicName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.24.24.22086",
+              "templateHash": "2068832606604952782"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Location for all resources"
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the storage account"
+              }
+            },
+            "storageContainerName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the storage container"
+              }
+            },
+            "eventGridTopicName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the event grid system topic"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', parameters('storageContainerName'))]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('storageAccountName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "isHnsEnabled": true
+              }
+            },
+            {
+              "type": "Microsoft.EventGrid/systemTopics",
+              "apiVersion": "2023-06-01-preview",
+              "name": "[parameters('eventGridTopicName')]",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "source": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+                "topicType": "Microsoft.Storage.StorageAccounts"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "type": "Microsoft.Resources/deployments",
@@ -543,7 +648,11 @@
             }
           ]
         }
-      }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('{0}-cluster', deployment().name))]",
+        "[resourceId('Microsoft.Resources/deployments', format('{0}-cluster', deployment().name))]"
+      ]
     }
   ]
 }

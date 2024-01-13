@@ -40,84 +40,31 @@ resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-3
   location: location
 }
 
-//  Dev cluster
-resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
-  name: kustoClusterName
-  location: location
-  sku: {
-    name: 'Dev(No SLA)_Standard_E2a_v4'
-    tier: 'Basic'
-    capacity: 1
-  }
-  properties: {
-    enableStreamingIngest: true
-  }
-
-  //  Landing database
-  resource db 'databases' = {
-    name: kustoDbName
-    kind: 'ReadWrite'
+module cluster 'cluster.bicep' = {
+  name: '${deployment().name}-cluster'
+  params: {
     location: location
-
-    //  Script to create landing table
-    resource script 'scripts' = {
-      name: 'setup'
-      properties: {
-        continueOnErrors: false
-        scriptContent: loadTextContent('script.kql')
-      }
-    }
-
-    //  Data plane permission:  admin for app 
-    resource appRole 'principalAssignments' = {
-      name: 'string'
-      properties: {
-        principalId: appIdentity.properties.principalId
-        principalType: 'App'
-        role: 'Ingestor'
-        tenantId: appIdentity.properties.tenantId
-      }
-    }
+    kustoClusterName: kustoClusterName
+    kustoDbName: kustoDbName
   }
 }
 
-resource storage 'Microsoft.Storage/storageAccounts@2022-09-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    isHnsEnabled: true
-  }
-
-  resource blobServices 'blobServices' = {
-    name: 'default'
-
-    resource testContainer 'containers' = {
-      name: storageContainerName
-      properties: {
-        publicAccess: 'None'
-      }
-    }
-  }
-}
-
-resource newBlobTopic 'Microsoft.EventGrid/systemTopics@2023-06-01-preview' = {
-  name: eventGridTopicName
-  location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    source: storage.id
-    topicType: 'Microsoft.Storage.StorageAccounts'
+module storage 'storage.bicep' = {
+  name: '${deployment().name}-cluster'
+  params: {
+    location: location
+    storageAccountName: storageAccountName
+    storageContainerName: storageContainerName
+    eventGridTopicName: eventGridTopicName
   }
 }
 
 module folderHandle 'folder-handler.bicep' = {
   name: '${deployment().name}-folder-handler'
+  dependsOn: [
+    cluster
+    storage
+  ]
   params: {
     location: location
     appIdentityName: appIdentityName
