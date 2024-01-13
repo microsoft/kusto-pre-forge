@@ -27,7 +27,7 @@ kpf-app-id-|User Managed Identity|Identity used by the container to access the s
 
 ![Sample resources](documentation/assets/complete-sample/sample-overview.png)
 
-You can test the solution by copying a big blob to the storage account's `test` container, in a folder named `landing`.  You should see 
+You can test the solution by copying a big blob to the storage account's `landing` container.  You should see (TODO) 
 
 ## Contributing
 
