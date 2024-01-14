@@ -17,5 +17,5 @@ jobs:
     - name: Deploy infra
       run: |
         cd deployment/infra
-        bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }}
+        bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }} ${{ secrets.DEPLOY_CLIENT_ID }}
 
