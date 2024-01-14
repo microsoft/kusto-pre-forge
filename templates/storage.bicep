@@ -24,7 +24,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   resource blobServices 'blobServices' = {
     name: 'default'
 
-    resource testContainer 'containers' = {
+    resource landingContainer 'containers' = {
       name: storageContainerName
       properties: {
         publicAccess: 'None'

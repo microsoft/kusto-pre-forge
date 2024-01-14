@@ -1,8 +1,14 @@
+@description('App ID of the principal running the tests')
+param testIdentityId string
+
 @description('Location for all resources')
 param location string = resourceGroup().location
 
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
+var storageAccountName = '${prefix}storage${suffix}'
+var testContainerName = 'integrated-tests'
+var landingFolder = 'tests-landing'
 var testCases = [
   {
     name: 'text'
@@ -22,9 +28,71 @@ module storage '../../templates/storage.bicep' = {
   name: '${deployment().name}-storage'
   params: {
     location: location
-    storageAccountName: '${prefix}storage${suffix}'
+    storageAccountName: storageAccountName
     storageContainerName: 'landing'
     eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
+  }
+}
+
+//  Add a container + policies to the storage account
+resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: storageAccountName
+
+  resource blobServices 'blobServices' existing= {
+    name: 'default'
+
+    resource testContainer 'containers' = {
+      name: testContainerName
+      properties: {
+        publicAccess: 'None'
+      }
+    }
+  }
+
+  resource policies 'managementPolicies' = {
+    name: 'default'
+    dependsOn: [storage]
+    properties: {
+      policy: {
+        rules: [
+          {
+            definition: {
+              actions: {
+                baseBlob: {
+                  delete: {
+                    daysAfterCreationGreaterThan: 1
+                  }
+                }
+              }
+              filters: {
+                prefixMatch: [
+                  '${testContainerName}/${landingFolder}/'
+                ]
+                blobTypes: [
+                  'blockBlob'
+                ]
+              }
+            }
+            enabled: true
+            name: 'clean-tests'
+            type: 'Lifecycle'
+          }
+        ]
+      }
+    }
+  }
+}
+
+//  Authorize principal to read / write storage (Storage Blob Data Contributor)
+resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(testIdentityId, storageAccount.id, 'rbac')
+  scope: storageAccount::blobServices::testContainer
+
+  properties: {
+    description: 'Giving data contributor'
+    principalId: testIdentityId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
   }
 }
 

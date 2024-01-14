@@ -4,18 +4,15 @@
 ##  Deploys Azure infrastructure
 
 rg=$1
-kustoIngestUri=$2
-kustoDb=$3
-kustoTable=$4
+testIdentityId=$2
 
 echo "Resource group:  $rg"
-echo "kustoIngestUri:  $kustoIngestUri"
-echo "kustoDb:  $kustoDb"
-echo "kustoTable:  $kustoTable"
+echo "testIdentityId:  $testIdentityId"
 echo "Current directory:  $(pwd)"
 
 echo
 echo "Deploying ARM template"
 
 az deployment group create -n "deploy-$(uuidgen)" -g $rg \
-    --template-file main.bicep
+    --template-file main.bicep \
+    --parameters testIdentityId=$testIdentityId
