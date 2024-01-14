@@ -1,4 +1,4 @@
-name:  Deploy Azure
+name:  Integrated Tests
 
 on:
   workflow_dispatch
