@@ -3,6 +3,8 @@ param location string = resourceGroup().location
 
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
+var storageAccountName = '${prefix}storage${suffix}'
+var testContainerName = 'integrated-tests'
 var testCases = [
   {
     name: 'text'
@@ -22,9 +24,56 @@ module storage '../../templates/storage.bicep' = {
   name: '${deployment().name}-storage'
   params: {
     location: location
-    storageAccountName: '${prefix}storage${suffix}'
+    storageAccountName: storageAccountName
     storageContainerName: 'landing'
     eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
+  }
+}
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: storageAccountName
+
+  resource blobServices 'blobServices' existing= {
+    name: 'default'
+
+    resource testContainer 'containers' = {
+      name: testContainerName
+      properties: {
+        publicAccess: 'None'
+      }
+    }
+  }
+
+  resource policies 'managementPolicies' = {
+    name: 'test-clean'
+    properties: {
+      policy: {
+        rules: [
+          {
+            definition: {
+              actions: {
+                baseBlob: {
+                  delete: {
+                    daysAfterCreationGreaterThan: 1
+                  }
+                }
+              }
+              filters: {
+                prefixMatch: [
+                  '${testContainerName}/test'
+                ]
+                blobTypes: [
+                  'blockBlob'
+                ]
+              }
+            }
+            enabled: true
+            name: 'clean-tests'
+            type: 'Lifecycle'
+          }
+        ]
+      }
+    }
   }
 }
 
