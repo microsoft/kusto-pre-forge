@@ -18,5 +18,4 @@ echo
 echo "Deploying ARM template"
 
 az deployment group create -n "deploy-$(uuidgen)" -g $rg \
-    --template-file main.bicep \
-    --parameters kustoIngestUri=$kustoIngestUri kustoDb=$kustoDb kustoTable=$kustoTable
+    --template-file main.bicep

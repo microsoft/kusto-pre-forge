@@ -99,6 +99,7 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
 
 resource newBlobSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2023-06-01-preview' = {
   name: eventGridSubscriptionName
+  parent: newBlobTopic
   dependsOn: [ topicBusRbacAuthorization ]
   properties: {
     deliveryWithResourceIdentity: {
