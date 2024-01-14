@@ -5,6 +5,7 @@ var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
 var storageAccountName = '${prefix}storage${suffix}'
 var testContainerName = 'integrated-tests'
+var landingFolder = 'tests-landing'
 var testCases = [
   {
     name: 'text'
@@ -45,7 +46,8 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
   }
 
   resource policies 'managementPolicies' = {
-    name: 'test-clean'
+    name: 'default'
+    dependsOn: [storage]
     properties: {
       policy: {
         rules: [
@@ -60,7 +62,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
               }
               filters: {
                 prefixMatch: [
-                  '${testContainerName}/test'
+                  '${testContainerName}/${landingFolder}'
                 ]
                 blobTypes: [
                   'blockBlob'
