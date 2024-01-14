@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.24.24.22086",
-      "templateHash": "8972332076303753648"
+      "templateHash": "4491936098898770179"
     }
   },
   "parameters": {
@@ -76,7 +76,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.24.24.22086",
-              "templateHash": "17194573789232760684"
+              "templateHash": "2318115522761387770"
             }
           },
           "parameters": {
@@ -155,12 +155,6 @@
             }
           },
           "resources": [
-            {
-              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-              "apiVersion": "2023-01-31",
-              "name": "[parameters('appIdentityName')]",
-              "location": "[parameters('location')]"
-            },
             {
               "type": "Microsoft.Resources/deployments",
               "apiVersion": "2022-09-01",
@@ -259,7 +253,7 @@
             {
               "type": "Microsoft.Resources/deployments",
               "apiVersion": "2022-09-01",
-              "name": "[format('{0}-cluster', deployment().name)]",
+              "name": "[format('{0}-storage', deployment().name)]",
               "properties": {
                 "expressionEvaluationOptions": {
                   "scope": "inner"
@@ -423,7 +417,7 @@
                     "_generator": {
                       "name": "bicep",
                       "version": "0.24.24.22086",
-                      "templateHash": "13784056294662312224"
+                      "templateHash": "15518286004137861524"
                     }
                   },
                   "parameters": {
@@ -552,7 +546,7 @@
                     {
                       "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
                       "apiVersion": "2023-06-01-preview",
-                      "name": "[parameters('eventGridSubscriptionName')]",
+                      "name": "[format('{0}/{1}', parameters('eventGridTopicName'), parameters('eventGridSubscriptionName'))]",
                       "properties": {
                         "deliveryWithResourceIdentity": {
                           "destination": {
@@ -722,7 +716,7 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Resources/deployments', format('{0}-cluster', deployment().name))]",
-                "[resourceId('Microsoft.Resources/deployments', format('{0}-cluster', deployment().name))]"
+                "[resourceId('Microsoft.Resources/deployments', format('{0}-storage', deployment().name))]"
               ]
             }
           ]
