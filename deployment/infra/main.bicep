@@ -1,6 +1,9 @@
 @description('App ID of the principal running the tests')
 param testIdentityId string
 
+@description('Object ID of the principal running the tests')
+param testIdentityObjectId string
+
 @description('Location for all resources')
 param location string = resourceGroup().location
 
@@ -104,12 +107,12 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
 //  Authorize principal to read / write storage (Storage Blob Data Contributor)
 resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(testIdentityId, storageAccount.id, 'rbac')
+  name: guid(testIdentityObjectId, storageAccount.id, 'rbac')
   scope: storageAccount::blobServices::testContainer
 
   properties: {
     description: 'Giving data contributor'
-    principalId: testIdentityId
+    principalId: testIdentityObjectId
     principalType: 'ServicePrincipal'
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
   }

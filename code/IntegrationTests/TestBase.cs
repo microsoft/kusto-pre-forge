@@ -48,6 +48,7 @@ namespace IntegrationTests
         private static readonly DataLakeDirectoryClient _testRoot;
 
         private readonly string _testPath;
+        private readonly DataLakeDirectoryClient _testTemplate;
 
         #region Static Construction
         static TestBase()
@@ -55,7 +56,7 @@ namespace IntegrationTests
             FileToEnvironmentVariables();
 
             _credentials = GetCredentials();
-            
+
             var blobLandingFolder = GetEnvironmentVariable("BlobLandingFolder");
 
             var landingTest = new DataLakeDirectoryClient(
@@ -119,12 +120,13 @@ namespace IntegrationTests
         protected TestBase(string testPath)
         {
             _testPath = testPath;
+            _testTemplate = _templateRoot.GetSubDirectoryClient(_testPath);
         }
 
         protected async Task<string> GetEmbeddedScriptAsync()
         {
             var assembly = GetType().Assembly;
-            string fullName = $"{assembly.GetName().Name}.{_testPath.Replace('/', '.')}.kql";
+            var fullName = $"{assembly.GetName().Name}.{_testPath.Replace('/', '.')}.kql";
 
             using (var stream = assembly.GetManifestResourceStream(fullName))
             {
@@ -139,14 +141,22 @@ namespace IntegrationTests
                     var text = await reader.ReadToEndAsync();
                     var replacedText = text.Replace(
                         "TEMPLATE_PATH",
-                        $"{_templateRoot.Uri}/{_testPath}/");
+                        _testTemplate.Uri.ToString());
 
                     return replacedText;
                 }
             }
         }
 
-        protected Task EnsureTemplateBlobTask(string script)
+        protected async Task EnsureTemplateBlobTask(string script)
+        {
+            if (!await _testTemplate.ExistsAsync())
+            {
+                await RunExportAsync();
+            }
+        }
+
+        private Task RunExportAsync()
         {
             throw new NotImplementedException();
         }
