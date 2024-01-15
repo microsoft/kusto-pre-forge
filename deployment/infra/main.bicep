@@ -124,6 +124,6 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
 }
 ]
 
-output storageLandingUrl string = '${storageAccount.properties.primaryLocation}/${testContainerName}/${landingFolder}'
+output storageLandingUrl string = '${storageAccount.properties.primaryEndpoints.blob}/${testContainerName}/${landingFolder}'
 
 output clusterIngestionUri string = cluster.outputs.clusterIngestionUri
