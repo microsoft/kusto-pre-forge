@@ -19,7 +19,7 @@ jobs:
       run: dotnet restore code
     # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build
     - name: .NET Build Console
-      run: dotnet build code/TestDataPopulation --configuration Release --no-restore
+      run: dotnet build code/IntegrationTests --configuration Release --no-restore
 
     - uses: actions/checkout@v2
     - name: Azure Login
