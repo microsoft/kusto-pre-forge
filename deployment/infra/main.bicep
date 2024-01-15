@@ -21,6 +21,7 @@ module cluster '../../templates/cluster.bicep' = {
     location: location
     kustoClusterTier: 'Standard'
     kustoClusterSku: 'Standard_E8ads_v5'
+    kustoClusterCapacity: 2
     kustoClusterName: '${prefix}kusto${suffix}'
     kustoDbName: 'test'
   }
