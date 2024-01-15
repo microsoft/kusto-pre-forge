@@ -46,6 +46,7 @@ namespace IntegrationTests
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
         private static readonly DataLakeDirectoryClient _testRoot;
+        private static readonly ExportManager _exportManager;
 
         private readonly string _testPath;
         private readonly DataLakeDirectoryClient _testTemplate;
@@ -67,6 +68,14 @@ namespace IntegrationTests
                 .GetParentDirectoryClient()
                 .GetSubDirectoryClient("template");
             _testRoot = landingTest.GetSubDirectoryClient(Guid.NewGuid().ToString());
+
+            var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
+            var kustoDb = GetEnvironmentVariable("KustoDb");
+
+            _exportManager = new ExportManager(
+                new Uri(kustoIngestUri),
+                kustoDb,
+                _credentials);
         }
 
         private static string GetEnvironmentVariable(string name)
@@ -130,7 +139,7 @@ namespace IntegrationTests
 
             if (!await _testTemplate.ExistsAsync())
             {
-                await RunExportAsync();
+                await _exportManager.RunExportAsync(script);
             }
         }
 
@@ -157,11 +166,6 @@ namespace IntegrationTests
                     return replacedText;
                 }
             }
-        }
-
-        private Task RunExportAsync()
-        {
-            throw new NotImplementedException();
         }
         #endregion
     }
