@@ -1,11 +1,15 @@
+
+
 namespace IntegrationTests.Text
 {
-    public class NoHeaderNoCompressionTest
+    public class NoHeaderNoCompressionTest : TestBase
     {
         [Fact]
-        public void Test1()
+        public async Task TestOutput()
         {
+            var script = await GetEmbeddedContentAsync("Text.NoHeaderNoCompression.kql");
 
+            await EnsureTemplateBlobTask(script);
         }
     }
 }
