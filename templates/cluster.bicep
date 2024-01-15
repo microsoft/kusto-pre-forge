@@ -49,3 +49,5 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
     }
   }
 }
+
+output clusterIngestionUri string = testCluster.properties.dataIngestionUri
