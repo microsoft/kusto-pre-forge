@@ -19,6 +19,8 @@ module cluster '../../templates/cluster.bicep' = {
   name: '${deployment().name}-cluster'
   params: {
     location: location
+    kustoClusterTier: 'Standard'
+    kustoClusterSku: 'Standard_E8ads_v5'
     kustoClusterName: '${prefix}kusto${suffix}'
     kustoDbName: 'test'
   }
@@ -38,7 +40,7 @@ module storage '../../templates/storage.bicep' = {
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
   name: storageAccountName
 
-  resource blobServices 'blobServices' existing= {
+  resource blobServices 'blobServices' existing = {
     name: 'default'
 
     resource testContainer 'containers' = {
@@ -51,7 +53,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
   resource policies 'managementPolicies' = {
     name: 'default'
-    dependsOn: [storage]
+    dependsOn: [ storage ]
     properties: {
       policy: {
         rules: [
