@@ -34,7 +34,7 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
   resource Identifier 'principalAssignments' = {
     name: 'testAdmin'
     dependsOn: [ clusterModule ]
-    
+
     properties: {
       principalId: testIdentityId
       principalType: 'App'
@@ -118,8 +118,8 @@ resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@20
 module folderHandle '../../templates/folder-handler.bicep' = [for case in testCases: {
   name: '${deployment().name}-${case.name}'
   dependsOn: [
-    cluster
-    storage
+    clusterModule
+    storageModule
   ]
   params: {
     location: location
@@ -142,4 +142,4 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
 
 output storageLandingUrl string = '${storageAccount.properties.primaryEndpoints.blob}${testContainerName}/${landingFolder}'
 
-output clusterIngestionUri string = cluster.outputs.clusterIngestionUri
+output clusterIngestionUri string = clusterModule.outputs.clusterIngestionUri
