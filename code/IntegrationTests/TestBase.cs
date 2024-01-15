@@ -123,7 +123,18 @@ namespace IntegrationTests
             _testTemplate = _templateRoot.GetSubDirectoryClient(_testPath);
         }
 
-        protected async Task<string> GetEmbeddedScriptAsync()
+        #region Export
+        protected async Task EnsureTemplateBlobTask()
+        {
+            var script = await GetEmbeddedScriptAsync();
+
+            if (!await _testTemplate.ExistsAsync())
+            {
+                await RunExportAsync();
+            }
+        }
+
+        private async Task<string> GetEmbeddedScriptAsync()
         {
             var assembly = GetType().Assembly;
             var fullName = $"{assembly.GetName().Name}.{_testPath.Replace('/', '.')}.kql";
@@ -148,17 +159,10 @@ namespace IntegrationTests
             }
         }
 
-        protected async Task EnsureTemplateBlobTask(string script)
-        {
-            if (!await _testTemplate.ExistsAsync())
-            {
-                await RunExportAsync();
-            }
-        }
-
         private Task RunExportAsync()
         {
             throw new NotImplementedException();
         }
+        #endregion
     }
 }

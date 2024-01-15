@@ -12,9 +12,7 @@ namespace IntegrationTests.Text
         [Fact]
         public async Task TestOutput()
         {
-            var script = await GetEmbeddedScriptAsync();
-
-            await EnsureTemplateBlobTask(script);
+            await EnsureTemplateBlobTask();
         }
     }
 }
