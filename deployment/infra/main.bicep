@@ -6,6 +6,7 @@ param location string = resourceGroup().location
 
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
+var clusterName = '${prefix}kusto${suffix}'
 var storageAccountName = '${prefix}storage${suffix}'
 var testContainerName = 'integrated-tests'
 var landingFolder = 'tests-landing'
@@ -15,19 +16,34 @@ var testCases = [
   }
 ]
 
-module cluster '../../templates/cluster.bicep' = {
+module clusterModule '../../templates/cluster.bicep' = {
   name: '${deployment().name}-cluster'
   params: {
     location: location
     kustoClusterTier: 'Standard'
     kustoClusterSku: 'Standard_E8ads_v5'
     kustoClusterCapacity: 2
-    kustoClusterName: '${prefix}kusto${suffix}'
+    kustoClusterName: clusterName
     kustoDbName: 'test'
   }
 }
 
-module storage '../../templates/storage.bicep' = {
+resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
+  name: clusterName
+
+  resource Identifier 'principalAssignments' = {
+    name: 'testAdmin'
+    dependsOn: [ clusterModule ]
+    
+    properties: {
+      principalId: testIdentityId
+      principalType: 'App'
+      role: 'AllDatabasesAdmin'
+    }
+  }
+}
+
+module storageModule '../../templates/storage.bicep' = {
   name: '${deployment().name}-storage'
   params: {
     location: location
@@ -54,7 +70,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
   resource policies 'managementPolicies' = {
     name: 'default'
-    dependsOn: [ storage ]
+    dependsOn: [ storageModule ]
     properties: {
       policy: {
         rules: [
@@ -124,6 +140,6 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
 }
 ]
 
-output storageLandingUrl string = '${storageAccount.properties.primaryEndpoints.blob}/${testContainerName}/${landingFolder}'
+output storageLandingUrl string = '${storageAccount.properties.primaryEndpoints.blob}${testContainerName}/${landingFolder}'
 
 output clusterIngestionUri string = cluster.outputs.clusterIngestionUri
