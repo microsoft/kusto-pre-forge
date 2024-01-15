@@ -139,7 +139,7 @@ namespace IntegrationTests
                     var text = await reader.ReadToEndAsync();
                     var replacedText = text.Replace(
                         "TEMPLATE_PATH",
-                        $"{_templateRoot.Uri}/{_testPath}");
+                        $"{_templateRoot.Uri}/{_testPath}/");
 
                     return replacedText;
                 }
