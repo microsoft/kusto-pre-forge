@@ -1,4 +1,8 @@
-﻿using System.Reflection;
+﻿using Azure.Core;
+using Azure.Identity;
+using Azure.Storage.Files.DataLake;
+using Azure.Storage.Files.DataLake.Specialized;
+using System.Reflection;
 using System.Text.Json;
 
 namespace IntegrationTests
@@ -39,12 +43,53 @@ namespace IntegrationTests
         }
         #endregion
 
+        private static readonly TokenCredential _credentials;
+        private static readonly DataLakeDirectoryClient _templateRoot;
+        private static readonly DataLakeDirectoryClient _testRoot;
+
         private readonly string _testPath;
 
         #region Static Construction
         static TestBase()
         {
             FileToEnvironmentVariables();
+
+            _credentials = GetCredentials();
+            
+            var blobLandingFolder = GetEnvironmentVariable("BlobLandingFolder");
+
+            var landingTest = new DataLakeDirectoryClient(
+                new Uri(blobLandingFolder),
+                _credentials);
+
+            _templateRoot = landingTest
+                .GetParentDirectoryClient()
+                .GetSubDirectoryClient("template");
+            _testRoot = landingTest.GetSubDirectoryClient(Guid.NewGuid().ToString());
+        }
+
+        private static string GetEnvironmentVariable(string name)
+        {
+            var blobLandingFolder = Environment.GetEnvironmentVariable(name);
+
+            if (string.IsNullOrWhiteSpace(blobLandingFolder))
+            {
+                throw new ArgumentNullException(name);
+            }
+
+            return blobLandingFolder;
+        }
+
+        private static TokenCredential GetCredentials()
+        {
+            var kustoTenantId = GetEnvironmentVariable("KustoTenantId");
+            var kustoSpId = GetEnvironmentVariable("KustoSpId");
+            var kustoSpSecret = GetEnvironmentVariable("KustoSpSecret");
+
+            return new ClientSecretCredential(
+                kustoTenantId,
+                kustoSpId,
+                kustoSpSecret);
         }
 
         private static void FileToEnvironmentVariables()
@@ -92,8 +137,11 @@ namespace IntegrationTests
                 using (var reader = new StreamReader(stream))
                 {
                     var text = await reader.ReadToEndAsync();
+                    var replacedText = text.Replace(
+                        "TEMPLATE_PATH",
+                        $"{_templateRoot.Uri}/{_testPath}");
 
-                    return text;
+                    return replacedText;
                 }
             }
         }
