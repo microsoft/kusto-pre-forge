@@ -25,8 +25,8 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
   name: kustoClusterName
   location: location
   sku: {
-    name: kustoClusterTier
-    tier: kustoClusterSku
+    name: kustoClusterSku
+    tier: kustoClusterTier
     capacity: kustoClusterCapacity
   }
   properties: {
