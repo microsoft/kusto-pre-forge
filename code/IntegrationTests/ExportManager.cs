@@ -12,12 +12,6 @@ namespace IntegrationTests
 {
     internal class ExportManager
     {
-        #region Inner types
-        private record ExportItem(
-            string operationId,
-            TaskCompletionSource source);
-        #endregion
-
         private readonly ICslAdminProvider _kustoProvider;
         private readonly string _database;
         private readonly OperationManager _operationManager;
