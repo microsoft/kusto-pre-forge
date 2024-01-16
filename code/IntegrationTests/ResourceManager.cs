@@ -14,5 +14,10 @@ namespace IntegrationTests
         {
             _capacity = capacity;
         }
+
+        internal Task PostResourceUtilizationAsync(Func<Task> resourceUtilizationFunc)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

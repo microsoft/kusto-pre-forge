@@ -8,5 +8,9 @@ namespace IntegrationTests
 {
     internal class OperationManager
     {
+        public Task AwaitCompletionAsync(string operationId)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

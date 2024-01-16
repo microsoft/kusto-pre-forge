@@ -73,6 +73,7 @@ namespace IntegrationTests
             var kustoDb = GetEnvironmentVariable("KustoDb");
 
             _exportManager = new ExportManager(
+                new OperationManager(),
                 new Uri(kustoIngestUri),
                 kustoDb,
                 _credentials);

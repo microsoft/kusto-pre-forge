@@ -5,6 +5,7 @@ using Kusto.Cloud.Platform.Storage.PersistentStorage;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
+using System;
 using System.Collections.Immutable;
 
 namespace IntegrationTests
@@ -19,12 +20,11 @@ namespace IntegrationTests
 
         private readonly ICslAdminProvider _kustoProvider;
         private readonly string _database;
-        private readonly Lazy<Task<long>> _exportCapacityLazyInit;
-        private volatile IImmutableList<ExportItem> _exportItems =
-            ImmutableArray<ExportItem>.Empty;
-        private volatile Task _registerTask = Task.CompletedTask;
+        private readonly OperationManager _operationManager;
+        private readonly Lazy<Task<ResourceManager>> _resourceManagerLazyInit;
 
         public ExportManager(
+            OperationManager operationManager,
             Uri kustoIngestUri,
             string database,
             TokenCredential credentials)
@@ -39,75 +39,37 @@ namespace IntegrationTests
 
             _kustoProvider = kustoProvider;
             _database = database;
-            _exportCapacityLazyInit = new Lazy<Task<long>>(
-                () => FetchCapacityAsync(),
+            _operationManager = operationManager;
+            _resourceManagerLazyInit = new Lazy<Task<ResourceManager>>(
+                CreateResourceManagerAsync,
                 LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
         public async Task RunExportAsync(string script)
         {
-            var item = await PostExportAsync(script);
+            var resourceManager = await _resourceManagerLazyInit.Value;
 
-            await item.source.Task;
+            await resourceManager.PostResourceUtilizationAsync(async () =>
+            {
+                var operationId = await PostExportAsync(script);
+
+                await _operationManager.AwaitCompletionAsync(operationId);
+            });
         }
 
-        private async Task<ExportItem> PostExportAsync(string script)
+        private async Task<string> PostExportAsync(string script)
         {
-            var capacity = await _exportCapacityLazyInit.Value;
-            var source = await ChallengeRegisterAsync();
-
-            while (_exportItems.Count >= capacity)
+            using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
+                _database,
+                script))
             {
-                await Task.WhenAny(_exportItems.Select(i => i.source.Task));
-                CleanItems();
-            }
-            try
-            {
-                using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
-                    _database,
-                    script))
-                {
-                    var operationId = (string)reader.ToDataSet().Tables[0].Rows[0][0];
-                    var taskSource = new TaskCompletionSource();
-                    var item = new ExportItem(operationId, taskSource);
+                var operationId = (string)reader.ToDataSet().Tables[0].Rows[0][0];
 
-                    _exportItems = _exportItems.Add(item);
-
-                    return item;
-                }
-            }
-            finally
-            {
-                source.SetResult();
+                return operationId;
             }
         }
 
-        private void CleanItems()
-        {
-            _exportItems = _exportItems
-                                .Where(i => !i.source.Task.IsCompleted)
-                                .ToImmutableArray();
-        }
-
-        private async Task<TaskCompletionSource> ChallengeRegisterAsync()
-        {   //  Capture current register
-            var oldTask = _registerTask;
-            var newTaskSource = new TaskCompletionSource();
-
-            await oldTask;
-            if (object.ReferenceEquals(
-                oldTask,
-                Interlocked.CompareExchange(ref _registerTask, newTaskSource.Task, oldTask)))
-            {
-                return newTaskSource;
-            }
-            else
-            {
-                return await ChallengeRegisterAsync();
-            }
-        }
-
-        private async Task<long> FetchCapacityAsync()
+        private async Task<ResourceManager> CreateResourceManagerAsync()
         {
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
                 _database,
@@ -115,7 +77,7 @@ namespace IntegrationTests
             {
                 var capacity = (long)reader.ToDataSet().Tables[0].Rows[0][0];
 
-                return capacity;
+                return new((int)capacity);
             }
         }
     }
