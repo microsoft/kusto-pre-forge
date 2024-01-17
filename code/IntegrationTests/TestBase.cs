@@ -2,6 +2,9 @@
 using Azure.Identity;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Specialized;
+using Kusto.Data;
+using Kusto.Data.Common;
+using Kusto.Data.Net.Client;
 using System.Reflection;
 using System.Text.Json;
 
@@ -71,12 +74,28 @@ namespace IntegrationTests
 
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
             var kustoDb = GetEnvironmentVariable("KustoDb");
+            var kustoProvider = CreateKustoProvider(kustoIngestUri, kustoDb, _credentials);
 
             _exportManager = new ExportManager(
-                new OperationManager(),
-                new Uri(kustoIngestUri),
-                kustoDb,
-                _credentials);
+                new OperationManager(kustoProvider),
+                kustoProvider);
+        }
+
+        private static ICslAdminProvider CreateKustoProvider(
+            string kustoIngestUri,
+            string kustoDb,
+            TokenCredential credentials)
+        {
+            var uriBuilder = new UriBuilder(kustoIngestUri);
+
+            uriBuilder.Host = uriBuilder.Host.Replace("ingest-", string.Empty);
+            uriBuilder.Path = kustoDb;
+
+            var kustoBuilder = new KustoConnectionStringBuilder(uriBuilder.ToString())
+                .WithAadAzureTokenCredentialsAuthentication(credentials);
+            var kustoProvider = KustoClientFactory.CreateCslAdminProvider(kustoBuilder);
+
+            return kustoProvider;
         }
 
         private static string GetEnvironmentVariable(string name)

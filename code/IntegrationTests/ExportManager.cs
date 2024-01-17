@@ -13,26 +13,14 @@ namespace IntegrationTests
     internal class ExportManager
     {
         private readonly ICslAdminProvider _kustoProvider;
-        private readonly string _database;
         private readonly OperationManager _operationManager;
         private readonly Lazy<Task<ResourceManager>> _resourceManagerLazyInit;
 
         public ExportManager(
             OperationManager operationManager,
-            Uri kustoIngestUri,
-            string database,
-            TokenCredential credentials)
+            ICslAdminProvider kustoProvider)
         {
-            var uriBuilder = new UriBuilder(kustoIngestUri);
-
-            uriBuilder.Host = uriBuilder.Host.Replace("ingest-", string.Empty);
-
-            var kustoBuilder = new KustoConnectionStringBuilder(uriBuilder.ToString())
-                .WithAadAzureTokenCredentialsAuthentication(credentials);
-            var kustoProvider = KustoClientFactory.CreateCslAdminProvider(kustoBuilder);
-
             _kustoProvider = kustoProvider;
-            _database = database;
             _operationManager = operationManager;
             _resourceManagerLazyInit = new Lazy<Task<ResourceManager>>(
                 CreateResourceManagerAsync,
@@ -54,19 +42,20 @@ namespace IntegrationTests
         private async Task<string> PostExportAsync(string script)
         {
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
-                _database,
+                string.Empty,
                 script))
             {
-                var operationId = (string)reader.ToDataSet().Tables[0].Rows[0][0];
+                var dataRow = reader.ToDataSet().Tables[0].Rows[0];
+                var operationId = (Guid)dataRow[0];
 
-                return operationId;
+                return operationId.ToString();
             }
         }
 
         private async Task<ResourceManager> CreateResourceManagerAsync()
         {
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
-                _database,
+                string.Empty,
                 ".show capacity data-export | project Total"))
             {
                 var capacity = (long)reader.ToDataSet().Tables[0].Rows[0][0];
