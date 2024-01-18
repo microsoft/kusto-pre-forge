@@ -1,5 +1,5 @@
 ﻿.export async compressed to csv (
-    h@"TEMPLATE_PATH;impersonate"
+    @"TEMPLATE_PATH;impersonate"
   )
   with (
     sizeLimit=1000000000,

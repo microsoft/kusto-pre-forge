@@ -80,6 +80,9 @@ namespace IntegrationTests
                             Item = i,
                             Terminated = indexedTerminated[i.operationId]
                         });
+                    var remainingItems = _operationItems
+                        .Where(i => !indexedTerminated.ContainsKey(i.operationId))
+                        .ToImmutableArray();
 
                     foreach (var r in results)
                     {
@@ -93,13 +96,15 @@ namespace IntegrationTests
                                 $"Operation failed with '{r.Terminated.status}'"));
                         }
                     }
+
+                    _operationItems = remainingItems;
                 }
             }
         }
 
         private async Task<IImmutableList<OperationTerminated>> FetchOperationStatusAsync()
         {
-            var operationIdList = string.Join(',', _operationItems.Select(i => i.operationId));
+            var operationIdList = string.Join(',', GetOperationIdSnapshot());
             var command = $".show operations ({operationIdList})";
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
                 string.Empty,
@@ -127,6 +132,16 @@ namespace IntegrationTests
                     .ToImmutableArray();
 
                 return terminated;
+            }
+        }
+
+        private IImmutableList<string> GetOperationIdSnapshot()
+        {
+            lock (_lock)
+            {
+                return _operationItems
+                    .Select(i => i.operationId)
+                    .ToImmutableArray();
             }
         }
     }
