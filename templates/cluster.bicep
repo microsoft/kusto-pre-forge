@@ -20,6 +20,9 @@ param kustoClusterName string
 @description('Name of the Kusto database')
 param kustoDbName string
 
+@description('Switch to run the test kusto script or not')
+param doRunKustoDbScript bool = true
+
 //  Dev cluster
 resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
   name: kustoClusterName
@@ -40,7 +43,7 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
     location: location
 
     //  Script to create landing table
-    resource script 'scripts' = {
+    resource script 'scripts' = if (doRunKustoDbScript) {
       name: 'setup'
       properties: {
         continueOnErrors: false

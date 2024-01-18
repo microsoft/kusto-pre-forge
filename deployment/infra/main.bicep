@@ -10,6 +10,7 @@ param location string = resourceGroup().location
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
 var clusterName = '${prefix}kusto${suffix}'
+var kustoDbName = 'test'
 var storageAccountName = '${prefix}storage${suffix}'
 var testContainerName = 'integrated-tests'
 var landingFolder = 'tests-landing'
@@ -27,7 +28,8 @@ module clusterModule '../../templates/cluster.bicep' = {
     kustoClusterSku: 'Standard_E8ads_v5'
     kustoClusterCapacity: 2
     kustoClusterName: clusterName
-    kustoDbName: 'test'
+    kustoDbName: kustoDbName
+    doRunKustoDbScript: false
   }
 }
 
@@ -42,6 +44,19 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
       principalId: testIdentityId
       principalType: 'App'
       role: 'AllDatabasesAdmin'
+    }
+  }
+
+  resource db 'databases' existing = {
+    name: kustoDbName
+
+    //  Script to create all landing tables
+    resource script 'scripts' = {
+      name: 'setupTables'
+      properties: {
+        continueOnErrors: false
+        scriptContent: loadTextContent('landing-tables.kql')
+      }
     }
   }
 }
