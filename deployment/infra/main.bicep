@@ -55,7 +55,7 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
       name: 'setupTables'
       properties: {
         continueOnErrors: false
-        scriptContent: loadTextContent('landing-tables.kql')
+        scriptContent: loadTextContent('schema.kql')
       }
     }
   }

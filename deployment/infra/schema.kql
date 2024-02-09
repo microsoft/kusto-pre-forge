@@ -1,0 +1,13 @@
+.create-or-alter function PopulateText() {
+    range i from 1 to 8 step 1
+    | extend Array=range(0,32,1)
+    | mv-apply Element=Array to typeof(int) on 
+    (
+    extend Letter = toint(rand(32))
+    | summarize Letters=make_list(Letter)
+    )
+    | extend Name=base64_encode_fromarray(Letters)
+    | project Id=i, Name
+}
+
+.create table Text1(Text:string)
