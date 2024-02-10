@@ -11,4 +11,3 @@
         | project Text=strcat(i, ", ", Name);
     Header
     | union (Data)}
-

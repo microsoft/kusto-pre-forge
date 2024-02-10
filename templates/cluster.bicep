@@ -39,8 +39,8 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' = {
   //  Landing database
   resource db 'databases' = {
     name: kustoDbName
-    kind: 'ReadWrite'
     location: location
+    kind: 'ReadWrite'
 
     //  Script to create landing table
     resource script 'scripts' = if (doRunKustoDbScript) {
