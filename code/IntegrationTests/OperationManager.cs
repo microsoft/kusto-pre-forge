@@ -45,24 +45,24 @@ namespace IntegrationTests
                 _operationItems = _operationItems.Add(item);
             }
 
-            await _trackOperationTask;
-            _trackOperationTask = TrackOperationAsync();
+            if (doNeedNewTrackOperation)
+            {
+                await _trackOperationTask;
+                _trackOperationTask = TrackOperationAsync();
+            }
             await item.source.Task;
         }
 
         private async Task TrackOperationAsync()
         {
-            var isCompleted = false;
-
             do
             {
                 await Task.Delay(OPERATION_TRACK_PERIOD);
-                await UpdateOperationStatusAsync();
             }
-            while (!isCompleted);
+            while (await UpdateOperationStatusAsync());
         }
 
-        private async Task UpdateOperationStatusAsync()
+        private async Task<bool> UpdateOperationStatusAsync()
         {
             var terminated = await FetchOperationStatusAsync();
 
@@ -98,8 +98,12 @@ namespace IntegrationTests
                     }
 
                     _operationItems = remainingItems;
+
+                    return remainingItems.Any();
                 }
             }
+
+            return true;
         }
 
         private async Task<IImmutableList<OperationTerminated>> FetchOperationStatusAsync()

@@ -35,7 +35,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\KustoPreForgeLib\KustoPreForgeLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Properties\launchSettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="TestCaseConfig.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

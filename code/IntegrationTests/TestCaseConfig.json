@@ -1,0 +1,8 @@
+﻿[
+  {
+    "function": "PopulateText",
+    "format": "text",
+    "blobFolder": "Text/NoHeaderNoCompression",
+    "table": "TextNoHeaderNoCompression"
+  }
+]

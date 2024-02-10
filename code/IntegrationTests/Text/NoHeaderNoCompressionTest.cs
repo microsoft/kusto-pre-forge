@@ -5,14 +5,14 @@ namespace IntegrationTests.Text
     public class NoHeaderNoCompressionTest : TestBase
     {
         public NoHeaderNoCompressionTest()
-            :base("Text/NoHeaderNoCompression")
+            : base("TextNoHeaderNoCompression")
         {
         }
 
         [Fact]
         public async Task TestOutput()
         {
-            await EnsureTemplateBlobTask();
+            await EnsureTableLoadAsync();
         }
     }
 }

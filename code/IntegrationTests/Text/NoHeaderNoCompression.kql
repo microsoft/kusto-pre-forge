@@ -1,20 +1,10 @@
-﻿.export async compressed to csv (
+﻿.export async compressed to FORMAT (
     @"TEMPLATE_PATH;impersonate"
   )
   with (
     sizeLimit=1000000000,
-    namePrefix="export-test/",
-    includeHeaders="all",
-    encoding="UTF8NoBOM",
-    sizeLimit=10000000000
+    namePrefix="export-test/FOLDER",
+    includeHeaders="all"
   )
   <| 
-  range i from 0 to 70000000 step 1
-  | project Id=i, Array=range(0,32,1)
-  | mv-apply Element=Array to typeof(int) on 
-  (
-    extend Letter = toint(rand(255))
-    | summarize Letters=make_list(Letter)
-  )
-  | extend Name=base64_encode_fromarray(Letters)
-  | project Id, Name
+  QUERY

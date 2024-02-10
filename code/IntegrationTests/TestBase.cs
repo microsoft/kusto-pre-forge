@@ -1,10 +1,14 @@
-﻿using Azure.Core;
+﻿using Azure;
+using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Specialized;
+using Kusto.Cloud.Platform.Utils;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
+using KustoPreForgeLib;
+using System.Collections.Immutable;
 using System.Reflection;
 using System.Text.Json;
 
@@ -46,12 +50,17 @@ namespace IntegrationTests
         }
         #endregion
 
+        private const string TEMPLATE_FOLDER = "template";
+
+        private static readonly IImmutableDictionary<string, TestCaseConfiguration> _configuration =
+            TestCaseConfiguration.LoadConfigurations();
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
         private static readonly DataLakeDirectoryClient _testRoot;
         private static readonly ExportManager _exportManager;
+        private static readonly Task _exportTask;
 
-        private readonly string _testPath;
+        private readonly string _tableName;
         private readonly DataLakeDirectoryClient _testTemplate;
 
         #region Static Construction
@@ -69,8 +78,10 @@ namespace IntegrationTests
 
             _templateRoot = landingTest
                 .GetParentDirectoryClient()
-                .GetSubDirectoryClient("template");
-            _testRoot = landingTest.GetSubDirectoryClient(Guid.NewGuid().ToString());
+                .GetSubDirectoryClient(TEMPLATE_FOLDER);
+            _testRoot = landingTest
+                .GetSubDirectoryClient("tests")
+                .GetSubDirectoryClient(Guid.NewGuid().ToString());
 
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
             var kustoDb = GetEnvironmentVariable("KustoDb");
@@ -79,6 +90,7 @@ namespace IntegrationTests
             _exportManager = new ExportManager(
                 new OperationManager(kustoProvider),
                 kustoProvider);
+            _exportTask = EnsureTemplatesAsync();
         }
 
         private static ICslAdminProvider CreateKustoProvider(
@@ -146,46 +158,84 @@ namespace IntegrationTests
         }
         #endregion
 
-        protected TestBase(string testPath)
+        protected TestBase(string tableName)
         {
-            _testPath = testPath;
-            _testTemplate = _templateRoot.GetSubDirectoryClient(_testPath);
+            _tableName = tableName;
+            _testTemplate = _templateRoot.GetSubDirectoryClient(_tableName);
+        }
+
+        protected async Task EnsureTableLoadAsync()
+        {
+            await _exportTask;
         }
 
         #region Export
-        protected async Task EnsureTemplateBlobTask()
+        private static async Task EnsureTemplatesAsync()
         {
-            var script = await GetEmbeddedScriptAsync();
+            var configurations = await GetConfigToExportAsync();
 
-            if (!await _testTemplate.ExistsAsync())
+            if (configurations.Any())
             {
-                await _exportManager.RunExportAsync(script);
+                var connectionString = _templateRoot.GetParentFileSystemClient().Uri.ToString();
+                var exportTasks = configurations
+                    .Select(config => ExportDataAsync(connectionString, config));
+
+                await Task.WhenAll(exportTasks);
             }
         }
 
-        private async Task<string> GetEmbeddedScriptAsync()
+        private static async Task<IImmutableList<TestCaseConfiguration>> GetConfigToExportAsync()
         {
-            var assembly = GetType().Assembly;
-            var fullName = $"{assembly.GetName().Name}.{_testPath.Replace('/', '.')}.kql";
-
-            using (var stream = assembly.GetManifestResourceStream(fullName))
+            if (await _templateRoot.ExistsAsync())
             {
-                if (stream == null)
-                {
-                    throw new ArgumentException(
-                        "No associated stream in assembly",
-                        nameof(_testPath));
-                }
-                using (var reader = new StreamReader(stream))
-                {
-                    var text = await reader.ReadToEndAsync();
-                    var replacedText = text.Replace(
-                        "TEMPLATE_PATH",
-                        _testTemplate.Uri.ToString());
+                var items = await _templateRoot.GetPathsAsync(true).ToListAsync();
+                var subPaths = items
+                    .Where(i => i.IsDirectory != true)
+                    .Select(i => i.Name)
+                    .Select(n => n.Substring(_templateRoot.Path.Length));
+                var remainingConfig = _configuration;
 
-                    return replacedText;
+                foreach (var subPath in subPaths)
+                {
+                    foreach (var config in _configuration.Values)
+                    {
+                        if (subPath.TrimStart('/').StartsWith(config.BlobFolder))
+                        {
+                            remainingConfig = remainingConfig.Remove(config.Table);
+                        }
+                    }
                 }
+
+                return remainingConfig.Values.ToImmutableArray();
             }
+            else
+            {
+                return _configuration.Values.ToImmutableArray();
+            }
+        }
+
+        private static async Task ExportDataAsync(
+            string connectionString,
+            TestCaseConfiguration config)
+        {
+            var exportFormat = config.Format == "text"
+                ? "csv"
+                : config.Format;
+            var prefix = $"{_templateRoot.Path}/{config.BlobFolder}/";
+            var script = $@"
+.export async compressed to {exportFormat} (
+    @""{connectionString};impersonate""
+  )
+  with (
+    sizeLimit=1000000000,
+    namePrefix=""{prefix}"",
+    distribution=""single"",
+    includeHeaders=""all""
+  )
+  <| 
+  {config.Function}";
+
+            await _exportManager.RunExportAsync(script);
         }
         #endregion
     }
