@@ -52,7 +52,7 @@ resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
 
     //  Script to create all landing tables
     resource script 'scripts' = {
-      name: 'setupTables'
+      name: 'schema'
       properties: {
         continueOnErrors: false
         scriptContent: loadTextContent('schema.kql')

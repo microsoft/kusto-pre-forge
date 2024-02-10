@@ -12,6 +12,3 @@
     Header
     | union (Data)}
 
-.set Text1 <|
-    PopulateText
-    | take 0
