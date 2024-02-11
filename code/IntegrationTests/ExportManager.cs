@@ -33,13 +33,13 @@ namespace IntegrationTests
 
             await resourceManager.PostResourceUtilizationAsync(async () =>
             {
-                var operationId = await PostExportAsync(script);
+                var operationId = await ExecuteAsyncExportAsync(script);
 
                 await _operationManager.AwaitCompletionAsync(operationId);
             });
         }
 
-        private async Task<string> PostExportAsync(string script)
+        private async Task<string> ExecuteAsyncExportAsync(string script)
         {
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
                 string.Empty,

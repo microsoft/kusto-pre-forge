@@ -32,23 +32,25 @@ namespace IntegrationTests
             _capacity = capacity;
         }
 
-        internal Task PostResourceUtilizationAsync(Func<Task> resourceUtilizationFunc)
+        public async Task PostResourceUtilizationAsync(Func<Task> resourceUtilizationFunc)
         {
             var queueItem = new QueueItem(
                 resourceUtilizationFunc,
                 new TaskCompletionSource());
 
             _requestQueue.Enqueue(queueItem);
-            TryUnqueue();
+            TryScheduleNewItems();
 
-            return queueItem.source.Task;
+            await queueItem.source.Task;
         }
 
-        private void TryUnqueue()
+        private void TryScheduleNewItems()
         {
             lock (_lock)
             {
-                var newRunningTaskItems = CleanRunningTasks();
+                var newRunningTaskItems = _runningTaskItems
+                    .Where(item => !item.source.Task.IsCompleted)
+                    .ToList();
 
                 while (newRunningTaskItems.Count < _capacity
                     && _requestQueue.TryDequeue(out var request))
@@ -56,35 +58,15 @@ namespace IntegrationTests
                     var runningTask = Task.Run(async () =>
                     {
                         await request.resourceUtilizationFunc();
-                        TryUnqueue();
+                        //  Signal completion
+                        request.source.SetResult();
+                        TryScheduleNewItems();
                     });
                     var runningItem = new RunningItem(runningTask, request.source);
 
                     newRunningTaskItems.Add(runningItem);
                 }
                 _runningTaskItems = newRunningTaskItems.ToImmutableArray();
-            }
-        }
-
-        private List<RunningItem> CleanRunningTasks()
-        {
-            lock (_lock)
-            {
-                var newRunningTaskItems = new List<RunningItem>(_runningTaskItems.Count);
-
-                foreach (var item in _runningTaskItems)
-                {
-                    if (item.runningTask.IsCompleted)
-                    {   //  Signal completion
-                        item.source.SetResult();
-                    }
-                    else
-                    {
-                        newRunningTaskItems.Add(item);
-                    }
-                }
-
-                return newRunningTaskItems;
             }
         }
     }
