@@ -13,7 +13,7 @@ var clusterName = '${prefix}kusto${suffix}'
 var kustoDbName = 'test'
 var storageAccountName = '${prefix}storage${suffix}'
 var testContainerName = 'integrated-tests'
-var landingFolder = 'tests-landing'
+var landingFolder = 'tests'
 var testCases = [
   {
     name: 'text'
