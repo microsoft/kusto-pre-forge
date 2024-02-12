@@ -14,11 +14,13 @@ echo "testIdentityObjectId:  $testIdentityObjectId"
 echo "Current directory:  $(pwd)"
 
 echo "Test cases:"
-echo $testCases
+echo "$testCases"
 
 #   Find and replace the value
 # Escape special characters in myvar using printf
+testCases=$(printf '%s\n' "$testCases" | sed 's/[\/&]/\\&/g; s/$$/\\n/')
 awk -v value="$testCases" '{gsub(/<VALUE>/, value)}1' main.parameters.template.json > main.parameters.json
+
 echo "Parameters:"
 cat main.parameters.json
 
