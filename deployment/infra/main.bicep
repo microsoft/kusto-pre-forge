@@ -132,8 +132,8 @@ resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@20
   }
 }
 
-module folderHandle '../../templates/folder-handler.bicep' = [for (case, i) in testCases: {
-  name: '${deployment().name}-${i}'
+module folderHandle '../../templates/folder-handler.bicep' = [for case in testCases: {
+  name: '${deployment().name}-${toLower(case.table)}'
   dependsOn: [
     clusterModule
     storageModule
@@ -152,7 +152,7 @@ module folderHandle '../../templates/folder-handler.bicep' = [for (case, i) in t
     //  Storage folder
     eventGridSubscriptionName: case.table
     appEnvironmentName: '${prefix}-app-env-${suffix}'
-    appName: '${prefix}-app-${suffix}-${case.table}'
+    appName: '${prefix}-app-${suffix}-${toLower(case.table)}'
     tableName: case.table
     format: case.format
     inputCompression:  case.inputCompression
