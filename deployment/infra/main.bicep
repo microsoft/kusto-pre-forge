@@ -65,7 +65,7 @@ module storageModule '../../templates/storage.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
-    storageContainerName: 'landing'
+    storageContainerName: testContainerName
     eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
   }
 }
@@ -76,13 +76,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
   resource blobServices 'blobServices' existing = {
     name: 'default'
-
-    resource testContainer 'containers' = {
-      name: testContainerName
-      properties: {
-        publicAccess: 'None'
-      }
-    }
   }
 
   resource policies 'managementPolicies' = {
@@ -147,7 +140,7 @@ module folderHandle '../../templates/folder-handler.bicep' = [for (case, i) in t
     serviceBusName: '${prefix}-service-bus-${suffix}'
     serviceBusQueueName: case.table
     storageAccountName: '${prefix}storage${suffix}'
-    storageContainerName: 'landing'
+    storageContainerName: testContainerName
     eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
     //  Storage folder
     eventGridSubscriptionName: case.table
