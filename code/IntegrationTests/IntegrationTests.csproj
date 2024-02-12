@@ -10,14 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Text\NoHeaderNoCompression.kql" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Text\NoHeaderNoCompression.kql" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.10.3" />
     <PackageReference Include="Azure.Storage.Files.DataLake" Version="12.17.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />

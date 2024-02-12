@@ -1,9 +1,10 @@
-﻿using Azure;
-using Azure.Core;
+﻿using Azure.Core;
 using Azure.Identity;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Specialized;
-using Kusto.Cloud.Platform.Utils;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
@@ -54,11 +55,12 @@ namespace IntegrationTests
 
         private static readonly IImmutableDictionary<string, TestCaseConfiguration> _configuration =
             TestCaseConfiguration.LoadConfigurations();
+        private static readonly string _testId = Guid.NewGuid().ToString();
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
-        private static readonly DataLakeDirectoryClient _testRoot;
+        private static readonly DataLakeDirectoryClient _testsRoot;
         private static readonly ExportManager _exportManager;
-        private static readonly Task _exportTask;
+        private static readonly Task _setupTask;
 
         private readonly string _tableName;
         private readonly DataLakeDirectoryClient _testTemplate;
@@ -79,9 +81,8 @@ namespace IntegrationTests
             _templateRoot = landingTest
                 .GetParentDirectoryClient()
                 .GetSubDirectoryClient(TEMPLATE_FOLDER);
-            _testRoot = landingTest
-                .GetSubDirectoryClient("tests")
-                .GetSubDirectoryClient(Guid.NewGuid().ToString());
+            _testsRoot = landingTest
+                .GetSubDirectoryClient("tests");
 
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
             var kustoDb = GetEnvironmentVariable("KustoDb");
@@ -90,7 +91,13 @@ namespace IntegrationTests
             _exportManager = new ExportManager(
                 new OperationManager(kustoProvider),
                 kustoProvider);
-            _exportTask = EnsureTemplatesAsync();
+            _setupTask = SetupAsync();
+        }
+
+        private static async Task SetupAsync()
+        {
+            await EnsureTemplatesAsync();
+            await CopyTemplatesAsync();
         }
 
         private static ICslAdminProvider CreateKustoProvider(
@@ -166,7 +173,7 @@ namespace IntegrationTests
 
         protected async Task EnsureTableLoadAsync()
         {
-            await _exportTask;
+            await _setupTask;
         }
 
         #region Export
@@ -236,6 +243,39 @@ namespace IntegrationTests
   {config.Function}";
 
             await _exportManager.RunExportAsync(script);
+        }
+        #endregion
+
+        #region Template Copy
+        private static async Task CopyTemplatesAsync()
+        {
+            var copyTasks = new List<Task>(_configuration.Count);
+
+            await foreach (var sourceItem in _templateRoot.GetPathsAsync(true))
+            {
+                if (sourceItem.IsDirectory != true)
+                {
+                    var sourceFileClient = _templateRoot
+                        .GetParentFileSystemClient()
+                        .GetFileClient(sourceItem.Name);
+                    var suffix = sourceItem.Name.Substring(_templateRoot.Name.Length);
+                    var parts = suffix.Split('/');
+                    var partsWithTestId = parts
+                        .SkipLast(1)
+                        .Skip(1)
+                        .Append(_testId)
+                        .Append(parts.Last());
+                    var suffixWithTestId = string.Join('/', partsWithTestId);
+                    var destinationFileClient = _testsRoot.GetFileClient(suffixWithTestId);
+                    var destinationBlobClient =
+                        new BlockBlobClient(destinationFileClient.Uri, _credentials);
+                    var task = destinationBlobClient.StartCopyFromUriAsync(sourceFileClient.Uri);
+
+                    copyTasks.Add(task);
+                }
+            }
+
+            await Task.WhenAll(copyTasks);
         }
         #endregion
     }
