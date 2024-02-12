@@ -17,7 +17,7 @@ echo "Test cases:"
 echo $testCases
 
 #   Find and replace the value
-sed "s/<VALUE>/$testCases/g" main.parameters.template.json > main.parameters.json
+sed "s#<VALUE>#$testCases#g" main.parameters.template.json > main.parameters.json
 echo "Parameters:"
 cat main.parameters.json
 
