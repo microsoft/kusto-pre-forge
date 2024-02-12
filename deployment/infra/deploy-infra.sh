@@ -18,8 +18,7 @@ echo $testCases
 
 #   Find and replace the value
 # Escape special characters in myvar using printf
-testCases=$(printf '%s\n' "$testCases" | sed 's/[\/&]/\\&/g; s/$$/\\n/')
-sed "s#<VALUE>#$testCases#g" main.parameters.template.json > main.parameters.json
+awk -v value="$testCases" '{gsub(/<VALUE>/, value)}1' main.parameters.template.json > main.parameters.json
 echo "Parameters:"
 cat main.parameters.json
 
