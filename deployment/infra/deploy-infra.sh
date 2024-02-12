@@ -3,6 +3,9 @@
 ##########################################################################
 ##  Deploys Azure infrastructure
 
+dos2unix ../../code/IntegrationTests/TestCaseConfig.json
+dos2unix main.parameters.template.json
+
 rg=$1
 testIdentityId=$2
 testIdentityObjectId=$3
@@ -17,8 +20,6 @@ echo "Test cases:"
 echo "$testCases"
 
 #   Find and replace the value
-# Escape special characters in myvar using printf
-testCases=$(printf '%s\n' "$testCases" | sed 's/[\/&]/\\&/g; s/$$/\\n/')
 awk -v value="$testCases" '{gsub(/<VALUE>/, value)}1' main.parameters.template.json > main.parameters.json
 
 echo "Parameters:"
