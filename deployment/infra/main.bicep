@@ -133,7 +133,7 @@ resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@20
 }
 
 module folderHandle '../../templates/folder-handler.bicep' = [for case in testCases: {
-  name: '${deployment().name}-${case.name}'
+  name: '${deployment().name}-${case.table}'
   dependsOn: [
     clusterModule
     storageModule

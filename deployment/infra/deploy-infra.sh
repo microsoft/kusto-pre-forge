@@ -12,11 +12,6 @@ echo "testIdentityId:  $testIdentityId"
 echo "testIdentityObjectId:  $testIdentityObjectId"
 echo "Current directory:  $(pwd)"
 
-#   Infer test cases
-testCases=$(sed 's/"/'\''/g; s/,//g' "../../code/IntegrationTests/TestCaseConfig.json")
-echo "Test cases:"
-echo "$testCases"
-
 echo
 echo "Deploying ARM template"
 
