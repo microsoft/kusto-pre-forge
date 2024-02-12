@@ -12,19 +12,15 @@ echo "testIdentityId:  $testIdentityId"
 echo "testIdentityObjectId:  $testIdentityObjectId"
 echo "Current directory:  $(pwd)"
 
+#   Infer test cases
+testCases=$(sed 's/"/'\''/g; s/,//g' "../../code/IntegrationTests/TestCaseConfig.json")
 echo "Test cases:"
 echo "$testCases"
-
-#   Create parameter file
-cat main.parameters.template.json ../../code/IntegrationTests/TestCaseConfig.json <(echo "}}}") > main.parameters.json
-
-echo "Parameters:"
-cat main.parameters.json
 
 echo
 echo "Deploying ARM template"
 
 az deployment group create -n "deploy-$(uuidgen)" -g $rg \
     --template-file main.bicep \
-    --parameters @main.parameters.json \
-    --parameters testIdentityId=$testIdentityId testIdentityObjectId=$testIdentityObjectId 
+    --parameters testIdentityId=$testIdentityId testIdentityObjectId=$testIdentityObjectId \
+    testCases=$testCases

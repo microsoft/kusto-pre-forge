@@ -3,4 +3,12 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "testCases": {
-            "value": 
+            "value": ﻿[
+  {
+    "function": "PopulateText",
+    "format": "txt",
+    "inputCompression": "None",
+    "blobFolder": "Text/NoHeaderNoCompression",
+    "table": "TextNoHeaderNoCompression"
+  }
+]}}}
