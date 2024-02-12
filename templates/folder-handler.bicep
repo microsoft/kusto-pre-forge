@@ -34,6 +34,18 @@ param appEnvironmentName string
 @description('Name of App')
 param appName string
 
+@description('Blob folder to watch')
+param blobFolder string
+
+@description('Name of Kusto table')
+param tableName string
+
+@description('File format')
+param format string
+
+@description('Input Compression')
+param inputCompression string
+
 var containerImageLocation = 'kustopreforge.azurecr.io/kusto-pre-forge/dev:latest'
 
 //  Identity orchestrating, i.e. accessing Kusto + Storage
@@ -114,7 +126,7 @@ resource newBlobSubscription 'Microsoft.EventGrid/systemTopics/eventSubscription
       }
     }
     filter: {
-      subjectBeginsWith: '/blobServices/default/containers/${storage::blobServices::testContainer.name}/blobs/'
+      subjectBeginsWith: '/blobServices/default/containers/${storage::blobServices::testContainer.name}/blobs/${blobFolder}'
       includedEventTypes: [
         'Microsoft.Storage.BlobCreated'
       ]
@@ -231,11 +243,15 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
             }
             {
               name: 'KustoTable'
-              value: 'Landing'
+              value: tableName
+            }
+            {
+              name: 'Format'
+              value: format
             }
             {
               name: 'InputCompression'
-              value: 'GZip'
+              value: inputCompression
             }
             {
               name: 'OutputCompression'

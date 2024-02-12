@@ -225,7 +225,7 @@ namespace IntegrationTests
             string connectionString,
             TestCaseConfiguration config)
         {
-            var exportFormat = config.Format == "text"
+            var exportFormat = config.Format == "txt"
                 ? "csv"
                 : config.Format;
             var prefix = $"{_templateRoot.Path}/{config.BlobFolder}/";

@@ -4,6 +4,9 @@ param testIdentityId string
 @description('Object ID of the principal running the tests')
 param testIdentityObjectId string
 
+@description('Array of test case objects with properties "format", "blobFolder" & "table"')
+param testCases array
+
 @description('Location for all resources')
 param location string = resourceGroup().location
 
@@ -14,11 +17,6 @@ var kustoDbName = 'test'
 var storageAccountName = '${prefix}storage${suffix}'
 var testContainerName = 'integrated-tests'
 var landingFolder = 'tests'
-var testCases = [
-  {
-    name: 'text'
-  }
-]
 
 module clusterModule '../../templates/cluster.bicep' = {
   name: '${deployment().name}-cluster'
@@ -147,14 +145,18 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
     kustoDbName: 'test'
     //  Kusto Table ???
     serviceBusName: '${prefix}-service-bus-${suffix}'
-    serviceBusQueueName: case.name
+    serviceBusQueueName: case.table
     storageAccountName: '${prefix}storage${suffix}'
     storageContainerName: 'landing'
     eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
     //  Storage folder
-    eventGridSubscriptionName: 'toServiceBus'
+    eventGridSubscriptionName: case.table
     appEnvironmentName: '${prefix}-app-env-${suffix}'
-    appName: '${prefix}-app-${suffix}-${case.name}'
+    appName: '${prefix}-app-${suffix}-${case.table}'
+    tableName: case.table
+    format: case.format
+    inputCompression:  case.inputCompression
+    blobFolder:  'tests/${case.inputCompression.blobFolder}'
   }
 }
 ]

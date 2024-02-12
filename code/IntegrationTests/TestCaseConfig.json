@@ -1,7 +1,8 @@
 ﻿[
   {
     "function": "PopulateText",
-    "format": "text",
+    "format": "txt",
+    "inputCompression": "None",
     "blobFolder": "Text/NoHeaderNoCompression",
     "table": "TextNoHeaderNoCompression"
   }
