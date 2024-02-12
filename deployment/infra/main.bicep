@@ -152,7 +152,7 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
     //  Storage folder
     eventGridSubscriptionName: case.table
     appEnvironmentName: '${prefix}-app-env-${suffix}'
-    appName: '${prefix}-app-${suffix}-${toLower(case.table)}'
+    appName: 'app-${toLower(case.table)}'
     tableName: case.table
     format: case.format
     inputCompression:  case.inputCompression
