@@ -156,7 +156,7 @@ module folderHandle '../../templates/folder-handler.bicep' = [for case in testCa
     tableName: case.table
     format: case.format
     inputCompression:  case.inputCompression
-    blobFolder:  'tests/${case.inputCompression.blobFolder}'
+    blobFolder:  'tests/${case.blobFolder}'
   }
 }
 ]
