@@ -6,7 +6,7 @@
 rg=$1
 testIdentityId=$2
 testIdentityObjectId=$3
-testCases = $(echo ../../code/IntegrationTests/TestCaseConfig.json)
+testCases = $(cat ../../code/IntegrationTests/TestCaseConfig.json)
 
 echo "Resource group:  $rg"
 echo "testIdentityId:  $testIdentityId"
