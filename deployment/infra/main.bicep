@@ -76,6 +76,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
   resource blobServices 'blobServices' existing = {
     name: 'default'
+    
+    resource testContainer 'containers' existing = {
+      name: testContainerName
+    }
   }
 
   resource policies 'managementPolicies' = {
