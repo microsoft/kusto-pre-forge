@@ -197,7 +197,7 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
   name: appName
   location: location
   dependsOn: [
-    appStorageRbacAuthorization
+    // appStorageRbacAuthorization
   ]
   identity: {
     type: 'UserAssigned'
