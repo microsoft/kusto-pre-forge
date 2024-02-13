@@ -5,6 +5,7 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Specialized;
+using Kusto.Cloud.Platform.Data;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
@@ -59,6 +60,7 @@ namespace IntegrationTests
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
         private static readonly DataLakeDirectoryClient _testsRoot;
+        private static readonly ICslAdminProvider _kustoProvider;
         private static readonly ExportManager _exportManager;
         private static readonly Task _setupTask;
 
@@ -86,17 +88,18 @@ namespace IntegrationTests
 
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
             var kustoDb = GetEnvironmentVariable("KustoDb");
-            var kustoProvider = CreateKustoProvider(kustoIngestUri, kustoDb, _credentials);
 
+            _kustoProvider = CreateKustoProvider(kustoIngestUri, kustoDb, _credentials);
             _exportManager = new ExportManager(
-                new OperationManager(kustoProvider),
-                kustoProvider);
+                new OperationManager(_kustoProvider),
+                _kustoProvider);
             _setupTask = SetupAsync();
         }
 
         private static async Task SetupAsync()
         {
             await EnsureTemplatesAsync();
+            await CleanTablesAsync();
             await CopyTemplatesAsync();
         }
 
@@ -243,6 +246,30 @@ namespace IntegrationTests
   {config.Function}";
 
             await _exportManager.RunExportAsync(script);
+        }
+        #endregion
+
+        #region Kusto Tables
+        private static async Task CleanTablesAsync()
+        {
+            var tableTextList = string.Join(
+                ", ",
+                _configuration.Values
+                .Select(c => c.Table));
+            var setTables = string.Join(
+                Environment.NewLine + Environment.NewLine,
+                _configuration.Values
+                .Select(c => $".set {c.Table} <| {c.Function}() | take 0"));
+            var script = @$"
+.execute database script with (ThrowOnErrors=true) <|
+    .drop tables ({tableTextList}) ifexists
+
+    {setTables}
+";
+
+            await _kustoProvider.ExecuteControlCommandAsync(
+                string.Empty,
+                script);
         }
         #endregion
 
