@@ -76,7 +76,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 
   resource blobServices 'blobServices' existing = {
     name: 'default'
-    
+
     resource testContainer 'containers' existing = {
       name: testContainerName
     }
@@ -120,6 +120,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(testIdentityObjectId, storageAccount.id, 'rbac')
   scope: storageAccount::blobServices::testContainer
+  dependsOn: [ storageModule ]
 
   properties: {
     description: 'Giving data contributor'
@@ -152,8 +153,8 @@ module folderHandle '../../templates/folder-handler.bicep' = [for (case, i) in t
     appName: 'app-${toLower(case.table)}'
     tableName: case.table
     format: case.format
-    inputCompression:  case.inputCompression
-    blobFolder:  'tests/${case.blobFolder}'
+    inputCompression: case.inputCompression
+    blobFolder: 'tests/${case.blobFolder}'
   }
 }
 ]
