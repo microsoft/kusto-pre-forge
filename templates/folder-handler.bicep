@@ -167,7 +167,6 @@ resource appBusRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-0
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
   }
 }
-*/
 
 //  Authorize principal to read / write storage (Storage Blob Data Contributor)
 resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -181,6 +180,7 @@ resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@20
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
   }
 }
+*/
 
 resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
   name: appEnvironmentName
