@@ -112,7 +112,7 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2022-10-01-preview' = {
 resource newBlobSubscription 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2023-06-01-preview' = {
   name: eventGridSubscriptionName
   parent: newBlobTopic
-  // dependsOn: [ topicBusRbacAuthorization ]
+  dependsOn: [ topicBusRbacAuthorization ]
   properties: {
     deliveryWithResourceIdentity: {
       destination: {
@@ -141,7 +141,6 @@ resource newBlobSubscription 'Microsoft.EventGrid/systemTopics/eventSubscription
   }
 }
 
-/*
 //  Authorize topic to send to service bus
 resource topicBusRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(newBlobTopic.id, serviceBus::queue.id, 'rbac')
@@ -180,7 +179,6 @@ resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@20
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
   }
 }
-*/
 
 resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
   name: appEnvironmentName
@@ -197,7 +195,7 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
   name: appName
   location: location
   dependsOn: [
-    // appStorageRbacAuthorization
+    appStorageRbacAuthorization
   ]
   identity: {
     type: 'UserAssigned'
