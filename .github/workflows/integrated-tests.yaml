@@ -21,7 +21,6 @@ jobs:
     - name: .NET Build Console
       run: dotnet build code/IntegrationTests --configuration Release --no-restore
 
-    - uses: actions/checkout@v2
     - name: Azure Login
       run: az login --service-principal -u ${{ secrets.DEPLOY_CLIENT_ID }} -p ${{ secrets.DEPLOY_SECRET }} --tenant ${{ secrets.TENANT_ID }}
     - name: Azure Subscription Set
