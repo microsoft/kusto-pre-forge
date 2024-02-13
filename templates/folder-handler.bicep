@@ -141,6 +141,7 @@ resource newBlobSubscription 'Microsoft.EventGrid/systemTopics/eventSubscription
   }
 }
 
+/*
 //  Authorize topic to send to service bus
 resource topicBusRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(newBlobTopic.id, serviceBus::queue.id, 'rbac')
@@ -166,6 +167,7 @@ resource appBusRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-0
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '4f6d3b9b-027b-4f4c-9142-0e5a2a2247e0')
   }
 }
+*/
 
 //  Authorize principal to read / write storage (Storage Blob Data Contributor)
 resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
