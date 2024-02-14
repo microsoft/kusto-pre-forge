@@ -1,14 +1,11 @@
 .create-or-alter function PopulateText() {
-    let Header = print Text="Id, Name";
-    let Data = range i from 1 to 1000 step 1
-        | extend Array=range(0,32,1)
-        | mv-apply Element=Array to typeof(int) on 
-        (
-            extend Letter = toint(rand(32))
-            | summarize Letters=make_list(Letter)
-        )
-        | extend Name=base64_encode_fromarray(Letters)
-        | project Text=strcat(i, ", ", Name);
-    Header
-    | union (Data)
+    range Id from 1 to 1000 step 1
+    | extend Array=range(0,32,1)
+    | mv-apply Element=Array to typeof(int) on 
+    (
+        extend Letter = toint(rand(32))
+        | summarize Letters=make_list(Letter)
+    )
+    | extend Name=base64_encode_fromarray(Letters)
+    | project Id, Name
 }

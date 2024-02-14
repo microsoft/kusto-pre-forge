@@ -42,6 +42,13 @@ namespace IntegrationTests
                 .ToImmutableDictionary(c => c.Table);
         }
 
+        public string GetCreateTableScript()
+        {
+            return Format == "txt"
+                ? $".create table {Table}(Text:string)"
+                : $".set {Table} <| {Function}() | take 0";
+        }
+
         private void Validate()
         {
             if (string.IsNullOrWhiteSpace(Function))

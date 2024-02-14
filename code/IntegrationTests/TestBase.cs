@@ -188,7 +188,8 @@ namespace IntegrationTests
             {
                 var connectionString = _templateRoot.GetParentFileSystemClient().Uri.ToString();
                 var exportTasks = configurations
-                    .Select(config => ExportDataAsync(connectionString, config));
+                    .Select(config => ExportDataAsync(connectionString, config))
+                    .ToImmutableArray();
 
                 await Task.WhenAll(exportTasks);
             }
@@ -233,7 +234,7 @@ namespace IntegrationTests
                 : config.Format;
             var prefix = $"{_templateRoot.Path}/{config.BlobFolder}/";
             var script = $@"
-.export async compressed to {exportFormat} (
+.export async to {exportFormat} (
     @""{connectionString};impersonate""
   )
   with (
@@ -259,7 +260,7 @@ namespace IntegrationTests
             var setTables = string.Join(
                 Environment.NewLine + Environment.NewLine,
                 _configuration.Values
-                .Select(c => $".set {c.Table} <| {c.Function}() | take 0"));
+                .Select(c => c.GetCreateTableScript()));
             var script = @$"
 .execute database script with (ThrowOnErrors=true) <|
     .drop tables ({tableTextList}) ifexists
