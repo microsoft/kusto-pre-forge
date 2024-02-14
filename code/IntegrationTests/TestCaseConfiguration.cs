@@ -17,6 +17,10 @@ namespace IntegrationTests
         public string BlobFolder { get; set; } = string.Empty;
 
         public string Table { get; set; } = string.Empty;
+        
+        public bool HasHeaders { get; set; } = true;
+        
+        public bool IsCompressed { get; set; } = false;
 
         public static IImmutableDictionary<string, TestCaseConfiguration> LoadConfigurations()
         {

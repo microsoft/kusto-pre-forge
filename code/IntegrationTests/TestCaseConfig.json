@@ -3,6 +3,8 @@
     "function": "PopulateText",
     "format": "txt",
     "inputCompression": "None",
+    "hasHeaders": false,
+    "isCompressed": false,
     "blobFolder": "Text/NoHeaderNoCompression",
     "table": "TextNoHeaderNoCompression"
   }

@@ -233,15 +233,17 @@ namespace IntegrationTests
                 ? "csv"
                 : config.Format;
             var prefix = $"{_templateRoot.Path}/{config.BlobFolder}/";
+            var compressed = config.IsCompressed ? "compressed" : string.Empty;
+            var headers = config.HasHeaders ? "all" : "none";
             var script = $@"
-.export async to {exportFormat} (
+.export async {compressed} to {exportFormat} (
     @""{connectionString};impersonate""
   )
   with (
     sizeLimit=1000000000,
     namePrefix=""{prefix}"",
     distribution=""single"",
-    includeHeaders=""all""
+    includeHeaders=""{headers}""
   )
   <| 
   {config.Function}";
