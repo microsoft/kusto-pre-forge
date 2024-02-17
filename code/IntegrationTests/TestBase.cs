@@ -11,7 +11,9 @@ using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
 using KustoPreForgeLib;
 using System.Collections.Immutable;
+using System.Data;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using System.Text.Json;
 
 namespace IntegrationTests
@@ -53,6 +55,7 @@ namespace IntegrationTests
         #endregion
 
         private const string TEMPLATE_FOLDER = "template";
+        private static readonly TimeSpan LOAD_TRACK_PERIOD = TimeSpan.FromSeconds(5);
 
         private static readonly IImmutableDictionary<string, TestCaseConfiguration> _configuration =
             TestCaseConfiguration.LoadConfigurations();
@@ -60,7 +63,8 @@ namespace IntegrationTests
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
         private static readonly DataLakeDirectoryClient _testsRoot;
-        private static readonly ICslAdminProvider _kustoProvider;
+        private static readonly ICslAdminProvider _kustoCommandProvider;
+        private static readonly ICslQueryProvider _kustoQueryProvider;
         private static readonly ExportManager _exportManager;
         private static readonly Task _setupTask;
 
@@ -89,10 +93,11 @@ namespace IntegrationTests
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
             var kustoDb = GetEnvironmentVariable("KustoDb");
 
-            _kustoProvider = CreateKustoProvider(kustoIngestUri, kustoDb, _credentials);
+            (_kustoCommandProvider, _kustoQueryProvider) =
+                CreateKustoProviders(kustoIngestUri, kustoDb, _credentials);
             _exportManager = new ExportManager(
-                new OperationManager(_kustoProvider),
-                _kustoProvider);
+                new OperationManager(_kustoCommandProvider),
+                _kustoCommandProvider);
             _setupTask = SetupAsync();
         }
 
@@ -103,7 +108,7 @@ namespace IntegrationTests
             await CopyTemplatesAsync();
         }
 
-        private static ICslAdminProvider CreateKustoProvider(
+        private static (ICslAdminProvider, ICslQueryProvider) CreateKustoProviders(
             string kustoIngestUri,
             string kustoDb,
             TokenCredential credentials)
@@ -115,9 +120,10 @@ namespace IntegrationTests
 
             var kustoBuilder = new KustoConnectionStringBuilder(uriBuilder.ToString())
                 .WithAadAzureTokenCredentialsAuthentication(credentials);
-            var kustoProvider = KustoClientFactory.CreateCslAdminProvider(kustoBuilder);
+            var kustoCommandProvider = KustoClientFactory.CreateCslAdminProvider(kustoBuilder);
+            var kustoQueryProvider = KustoClientFactory.CreateCslQueryProvider(kustoBuilder);
 
-            return kustoProvider;
+            return (kustoCommandProvider, kustoQueryProvider);
         }
 
         private static string GetEnvironmentVariable(string name)
@@ -174,10 +180,72 @@ namespace IntegrationTests
             _testTemplate = _templateRoot.GetSubDirectoryClient(_tableName);
         }
 
+        #region Table Load
         protected async Task EnsureTableLoadAsync()
         {
+            int? totalShardCount = null;
+
             await _setupTask;
+            while ((totalShardCount = await TrackTotalShardCountLoadedAsync()) == null)
+            {
+                await Task.Delay(LOAD_TRACK_PERIOD);
+            }
+            while (await TrackShardCountLoadedAsync() != totalShardCount)
+            {
+                await Task.Delay(LOAD_TRACK_PERIOD);
+            }
         }
+
+        private async Task<int?> TrackTotalShardCountLoadedAsync()
+        {
+            var query = @$"
+{_tableName}
+| summarize Tags=take_any(extent_tags()) by ExtentId=extent_id()
+| where Tags has ""kpf-last-shard""
+| mv-expand Tags
+| where Tags has ""kpf-shard-id""
+| project ShardCount=toint(split(Tags,':')[1])";
+
+            using (var reader = await _kustoQueryProvider.ExecuteQueryAsync(
+                string.Empty,
+                query,
+                new ClientRequestProperties()))
+            {
+                var result = reader.ToDataSet().Tables[0].Rows
+                    .Cast<DataRow>()
+                    .Select(r => (int)r["ShardCount"])
+                    .FirstOrDefault();
+
+                return result == 0
+                    ? null
+                    : result;
+            }
+        }
+
+        private async Task<int> TrackShardCountLoadedAsync()
+        {
+            var query = @$"
+{_tableName}
+| summarize Tags=take_any(extent_tags()) by ExtentId=extent_id()
+| mv-expand Tags
+| where Tags has ""kpf-shard-id""
+| project ShardId=split(Tags, "":"")[1]
+| summarize Cardinality=toint(count())";
+
+            using (var reader = await _kustoQueryProvider.ExecuteQueryAsync(
+                string.Empty,
+                query,
+                new ClientRequestProperties()))
+            {
+                var cardinality = reader.ToDataSet().Tables[0].Rows
+                    .Cast<DataRow>()
+                    .Select(r => (int)r["Cardinality"])
+                    .FirstOrDefault();
+
+                return cardinality;
+            }
+        }
+        #endregion
 
         #region Export
         private static async Task EnsureTemplatesAsync()
@@ -270,7 +338,7 @@ namespace IntegrationTests
     {setTables}
 ";
 
-            await _kustoProvider.ExecuteControlCommandAsync(
+            await _kustoCommandProvider.ExecuteControlCommandAsync(
                 string.Empty,
                 script);
         }

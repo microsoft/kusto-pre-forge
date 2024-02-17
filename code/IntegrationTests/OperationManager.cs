@@ -110,6 +110,7 @@ namespace IntegrationTests
         {
             var operationIdList = string.Join(',', GetOperationIdSnapshot());
             var command = $".show operations ({operationIdList})";
+
             using (var reader = await _kustoProvider.ExecuteControlCommandAsync(
                 string.Empty,
                 command))
