@@ -31,3 +31,25 @@ jobs:
         cd deployment/infra
         bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }} ${{ secrets.DEPLOY_CLIENT_ID }} ${{ secrets.DEPLOY_OBJECT_ID }}
 
+    - name: Set environment variables
+      shell:  bash
+      run: |
+        # Fetch cluster
+        clusterIngestUri=$(az kusto cluster list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].dataIngestionUri" -o tsv)
+        echo "Cluster Ingestion Uri:  $clusterIngestUri"
+        # Fetch storage
+        landerFolderUri=$(az storage account list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].primaryEndpoints.blob" -o tsv)
+        echo "Landing folder URI:  $landerFolderUri"
+        # Environment variables
+        echo "BlobLandingFolder=$clusterUri" >> $GITHUB_ENV
+        echo "KustoIngestUri=$clusterIngestUri" >> $GITHUB_ENV
+        echo "KustoDb=test" >> $GITHUB_ENV
+        echo "KustoTenantId=${{ secrets.TENANT_ID }}" >> $GITHUB_ENV
+        echo "KustoSpId=${{ secrets.DEPLOY_CLIENT_ID }}" >> $GITHUB_ENV
+        echo "KustoSpSecret=${{ secrets.DEPLOY_SECRET }}" >> $GITHUB_ENV
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-test
+    - name:  Tests
+      shell:  bash
+      run: |
+        dotnet test code/IntegrationTests \
+        --configuration Release --no-build --verbosity normal
