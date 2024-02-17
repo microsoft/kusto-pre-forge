@@ -68,8 +68,9 @@ namespace IntegrationTests
         private static readonly ExportManager _exportManager;
         private static readonly Task _setupTask;
 
-        private readonly string _tableName;
         private readonly DataLakeDirectoryClient _testTemplate;
+
+        protected string TableName { get; }
 
         #region Static Construction
         static TestBase()
@@ -176,9 +177,38 @@ namespace IntegrationTests
 
         protected TestBase(string tableName)
         {
-            _tableName = tableName;
-            _testTemplate = _templateRoot.GetSubDirectoryClient(_tableName);
+            TableName = tableName;
+            _testTemplate = _templateRoot.GetSubDirectoryClient(TableName);
         }
+
+        #region Kusto Helpers
+        protected async Task<T?> QueryOneRowAsync<T>(
+            string query,
+            Func<DataRow, T> projection)
+        {
+            var results = await QueryAsync(query, projection);
+
+            return results.FirstOrDefault();
+        }
+
+        protected async Task<IImmutableList<T>> QueryAsync<T>(
+            string query,
+            Func<DataRow, T> projection)
+        {
+            using (var reader = await _kustoQueryProvider.ExecuteQueryAsync(
+                string.Empty,
+                query,
+                new ClientRequestProperties()))
+            {
+                var results = reader.ToDataSet().Tables[0].Rows
+                    .Cast<DataRow>()
+                    .Select(r => projection(r))
+                    .ToImmutableArray();
+
+                return results;
+            }
+        }
+        #endregion
 
         #region Table Load
         protected async Task EnsureTableLoadAsync()
@@ -199,51 +229,31 @@ namespace IntegrationTests
         private async Task<int?> TrackTotalShardCountLoadedAsync()
         {
             var query = @$"
-{_tableName}
+{TableName}
 | summarize Tags=take_any(extent_tags()) by ExtentId=extent_id()
 | where Tags has ""kpf-last-shard""
 | mv-expand Tags
 | where Tags has ""kpf-shard-id""
 | project ShardCount=toint(split(Tags,':')[1])";
+            var result = await QueryOneRowAsync(query, r => (int)r["ShardCount"]);
 
-            using (var reader = await _kustoQueryProvider.ExecuteQueryAsync(
-                string.Empty,
-                query,
-                new ClientRequestProperties()))
-            {
-                var result = reader.ToDataSet().Tables[0].Rows
-                    .Cast<DataRow>()
-                    .Select(r => (int)r["ShardCount"])
-                    .FirstOrDefault();
-
-                return result == 0
-                    ? null
-                    : result;
-            }
+            return result == 0
+                ? null
+                : result;
         }
 
         private async Task<int> TrackShardCountLoadedAsync()
         {
             var query = @$"
-{_tableName}
+{TableName}
 | summarize Tags=take_any(extent_tags()) by ExtentId=extent_id()
 | mv-expand Tags
 | where Tags has ""kpf-shard-id""
 | project ShardId=split(Tags, "":"")[1]
 | summarize Cardinality=toint(count())";
+            var cardinality = await QueryOneRowAsync(query, r => (int)r["Cardinality"]);
 
-            using (var reader = await _kustoQueryProvider.ExecuteQueryAsync(
-                string.Empty,
-                query,
-                new ClientRequestProperties()))
-            {
-                var cardinality = reader.ToDataSet().Tables[0].Rows
-                    .Cast<DataRow>()
-                    .Select(r => (int)r["Cardinality"])
-                    .FirstOrDefault();
-
-                return cardinality;
-            }
+            return cardinality;
         }
         #endregion
 
