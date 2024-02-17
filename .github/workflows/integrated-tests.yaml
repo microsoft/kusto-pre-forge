@@ -41,7 +41,7 @@ jobs:
         landerFolderUri=$(az storage account list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].primaryEndpoints.blob" -o tsv)
         echo "Landing folder URI:  $landerFolderUri/integrated-tests"
         # Environment variables
-        echo "BlobLandingFolder=$clusterUri" >> $GITHUB_ENV
+        echo "BlobLandingFolder=$landerFolderUri" >> $GITHUB_ENV
         echo "KustoIngestUri=$clusterIngestUri" >> $GITHUB_ENV
         echo "KustoDb=test" >> $GITHUB_ENV
         echo "KustoTenantId=${{ secrets.TENANT_ID }}" >> $GITHUB_ENV
