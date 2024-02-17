@@ -39,7 +39,7 @@ jobs:
         echo "Cluster Ingestion Uri:  $clusterIngestUri"
         # Fetch storage
         landerFolderUri=$(az storage account list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].primaryEndpoints.blob" -o tsv)
-        echo "Landing folder URI:  $landerFolderUri"
+        echo "Landing folder URI:  $landerFolderUri/integrated-tests"
         # Environment variables
         echo "BlobLandingFolder=$clusterUri" >> $GITHUB_ENV
         echo "KustoIngestUri=$clusterIngestUri" >> $GITHUB_ENV
