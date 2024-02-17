@@ -39,7 +39,7 @@ namespace KustoPreForgeLib.LineBased
             return blobStream;
         }
 
-        protected override Task PostWriteAsync()
+        protected override Task PostWriteAsync(bool isLastShard)
         {
             //   Do nothing as we write to blob directly
 
