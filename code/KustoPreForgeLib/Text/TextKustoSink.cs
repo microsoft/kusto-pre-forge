@@ -1,6 +1,5 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 using Kusto.Ingest;
 using System;
 using System.Collections.Generic;
@@ -24,7 +23,7 @@ namespace KustoPreForgeLib.LineBased
         {
             var shardName =
                 $"{blobNamePrefix}-{shardId}.txt{GetCompressionExtension()}";
-            
+
             _shardBlobClient = Context
                 .RoundRobinIngestStagingContainer()
                 .GetBlobClient(shardName);
@@ -42,14 +41,25 @@ namespace KustoPreForgeLib.LineBased
             return blobStream;
         }
 
-        protected override async Task PostWriteAsync()
+        protected override async Task PostWriteAsync(bool isLastShard)
         {
             var properties = Context.CreateIngestionProperties();
             var tagValue = $"{Context.SourceBlobClient!.Uri}-{ShardId}";
 
             properties.IngestByTags = new[] { tagValue };
             properties.IngestIfNotExists = new[] { tagValue };
-            properties.AdditionalTags = new[] { $"original-blob:{Context.SourceBlobClient.Uri}" };
+            properties.AdditionalTags = isLastShard
+                ? new[]
+                {
+                    $"kpf-original-blob:{Context.SourceBlobClient.Uri}",
+                    $"kpf-shard-id:{ShardId}",
+                    $"kpf-last-shard"
+                }
+                : new[]
+                {
+                    $"kpf-original-blob:{Context.SourceBlobClient.Uri}",
+                    $"kpf-shard-id:{ShardId}"
+                };
 
             await Context.IngestClient!.IngestFromStorageAsync(
                 _shardBlobClient.Uri.ToString(),

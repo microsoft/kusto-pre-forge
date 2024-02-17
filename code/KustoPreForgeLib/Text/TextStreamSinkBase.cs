@@ -65,14 +65,14 @@ namespace KustoPreForgeLib.LineBased
                     while (countingStream.Position < Context.BlobSettings.MaxBytesPerShard
                     && !(fragmentResult = await fragmentQueue.DequeueAsync()).IsCompleted);
                 }
-                await PostWriteAsync();
+                await PostWriteAsync(fragmentResult.IsCompleted);
                 Console.WriteLine($"Sealed shard {ShardId} ({stopwatch.Elapsed})");
             }
         }
 
         protected abstract Task<Stream> CreateOutputStreamAsync();
 
-        protected abstract Task PostWriteAsync();
+        protected abstract Task PostWriteAsync(bool isLastShard);
 
         protected string GetCompressionExtension()
         {
