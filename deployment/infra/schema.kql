@@ -1,4 +1,4 @@
-.create-or-alter function PopulateText() {
+.create-or-alter function GenerateLogData() {
     let IdRange = 1000;
     let TextLengthMin = 30;
     let TextLengthMax = 150;

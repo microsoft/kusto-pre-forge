@@ -1,6 +1,6 @@
 [
   {
-    "function": "PopulateText",
+    "function": "GenerateLogData",
     "format": "txt",
     "inputCompression": "None",
     "hasHeaders": false,
