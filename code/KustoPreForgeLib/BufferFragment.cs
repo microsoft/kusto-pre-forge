@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Kusto.Cloud.Platform.Utils;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -9,23 +10,19 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal class BufferFragment : IEnumerable<byte>//, IDisposable
+    internal class BufferFragment : IEnumerable<byte>, IDisposable
     {
-        private readonly ThreadSafeCounter _counter;
-        private readonly byte[] _buffer;
-        private readonly int _offset;
+        private readonly IImmutableList<ThreadSafeCounter> _counters;
+        private readonly BufferSubset _bufferSubset;
 
         #region Constructors
         private BufferFragment(
-            ThreadSafeCounter counter,
-            byte[] buffer,
-            int offset,
-            int length)
+            IEnumerable<ThreadSafeCounter> counters,
+            BufferSubset bufferSubset)
         {
-            _counter = counter;
-            _buffer = buffer;
-            _offset = offset;
-            Length = length;
+            _counters = counters.ToImmutableArray();
+            _counters.ForEach(c => c.Increment());
+            _bufferSubset = bufferSubset;
         }
 
         public static BufferFragment Create(int length)
@@ -40,50 +37,28 @@ namespace KustoPreForgeLib
             }
             else
             {
-                return new BufferFragment(new ThreadSafeCounter(), new byte[length], 0, length);
+                return new BufferFragment(
+                    new ThreadSafeCounter[] { new ThreadSafeCounter() },
+                    new BufferSubset(new byte[length], 0, length));
             }
         }
         #endregion
 
         public static BufferFragment Empty { get; } =
-            new BufferFragment(new ThreadSafeCounter(), new byte[0], 0, 0);
+            new BufferFragment(new ThreadSafeCounter[0], BufferSubset.Empty);
 
-        public int Length { get; }
+        public int Length => _bufferSubset.Length;
 
         public bool Any() => Length > 0;
 
-        public bool IsContiguouslyBefore(BufferFragment other)
+        public Memory<byte> GetMemoryBlock()
         {
-            CheckIfSameBuffer(other);
-
-            if (_buffer.Length != 0)
-            {
-                var end = (_offset + Length) % _buffer.Length;
-
-                return end == other._offset;
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-        public IEnumerable<Memory<byte>> GetMemoryBlocks()
-        {
-            if (_offset + Length <= _buffer.Length)
-            {
-                yield return new Memory<byte>(_buffer, _offset, Length);
-            }
-            else
-            {
-                yield return new Memory<byte>(_buffer, _offset, _buffer.Length - _offset);
-                yield return new Memory<byte>(_buffer, 0, Length - (_buffer.Length - _offset));
-            }
+            return new Memory<byte>(_bufferSubset.Buffer, _bufferSubset.Offset, Length);
         }
 
         public override string ToString()
         {
-            return $"({_offset}, {(_offset + Length) % _buffer.Length}):  Length = {Length}";
+            return _bufferSubset.ToString();
         }
 
         #region Merge
@@ -99,70 +74,37 @@ namespace KustoPreForgeLib
             }
             else
             {
-                CheckIfSameBuffer(other);
-
-                var end = (_offset + Length) % _buffer.Length;
-                var otherEnd = (other._offset + other.Length) % _buffer.Length;
-
-                if (end == other._offset)
+                if (!object.ReferenceEquals(_bufferSubset.Buffer, other._bufferSubset.Buffer))
                 {
-                    return new BufferFragment(new ThreadSafeCounter(), _buffer, _offset, Length + other.Length);
+                    throw new ArgumentException(nameof(other), "Not related to same buffer");
                 }
-                else if (otherEnd == _offset)
+
+                var end = _bufferSubset.Offset + Length;
+                var otherEnd = other._bufferSubset.Offset + other.Length;
+
+                if (end == other._bufferSubset.Offset)
                 {
-                    return new BufferFragment(new ThreadSafeCounter(), _buffer, other._offset, Length + other.Length);
+                    return new BufferFragment(
+                        _counters.Concat(other._counters),
+                        new BufferSubset(
+                            _bufferSubset.Buffer,
+                            _bufferSubset.Offset,
+                            Length + other.Length));
+                }
+                else if (otherEnd == _bufferSubset.Offset)
+                {
+                    return new BufferFragment(
+                        _counters.Concat(other._counters),
+                        new BufferSubset(
+                            _bufferSubset.Buffer,
+                            other._bufferSubset.Offset,
+                            Length + other.Length));
                 }
                 else
                 {
                     return null;
                 }
             }
-        }
-
-        public BufferFragment Merge(BufferFragment other)
-        {
-            var mergedFragment = TryMerge(other);
-
-            if (mergedFragment != null)
-            {
-                return mergedFragment;
-            }
-            else
-            {
-                throw new ArgumentException(nameof(other), "Not contiguous");
-            }
-        }
-
-        public (BufferFragment Fragment, IImmutableList<BufferFragment> List) TryMerge(
-            IEnumerable<BufferFragment> others)
-        {
-            var list = new List<BufferFragment>(others);
-            var indexToRemove = new List<int>(list.Count);
-            var mergedFragment = this;
-
-            do
-            {
-                indexToRemove.Clear();
-
-                for (int i = 0; i != list.Count; ++i)
-                {
-                    var other = list[i];
-                    var tryMergedFragment = mergedFragment.TryMerge(other);
-
-                    if (tryMergedFragment != null)
-                    {
-                        mergedFragment = mergedFragment.Merge(other);
-                        indexToRemove.Add(i);
-                    }
-                }
-                foreach (var i in indexToRemove.Reverse<int>())
-                {
-                    list.RemoveAt(i);
-                }
-            }
-            while (indexToRemove.Any() && list.Any());
-
-            return (mergedFragment, list.ToImmutableArray());
         }
         #endregion
 
@@ -186,7 +128,9 @@ namespace KustoPreForgeLib
             }
             else
             {
-                return new BufferFragment(_counter, _buffer, _offset, index);
+                return new BufferFragment(
+                    _counters,
+                    new BufferSubset(_bufferSubset.Buffer, _bufferSubset.Offset, index));
             }
         }
 
@@ -210,10 +154,11 @@ namespace KustoPreForgeLib
             else
             {
                 return new BufferFragment(
-                    _counter,
-                    _buffer,
-                    (_offset + index + 1) % _buffer.Length,
-                    Length - index - 1);
+                    _counters,
+                    new BufferSubset(
+                        _bufferSubset.Buffer,
+                        (_bufferSubset.Offset + index + 1) % _bufferSubset.Buffer.Length,
+                        Length - index - 1));
             }
         }
         #endregion
@@ -221,11 +166,11 @@ namespace KustoPreForgeLib
         #region IEnumerable<byte>
         IEnumerator<byte> IEnumerable<byte>.GetEnumerator()
         {
-            var end = _offset + Length;
+            var end = _bufferSubset.Offset + Length;
 
-            for (int i = _offset; i != end; ++i)
+            for (int i = _bufferSubset.Offset; i != end; ++i)
             {
-                yield return _buffer[i % _buffer.Length];
+                yield return _bufferSubset.Buffer[i];
             }
         }
 
@@ -235,12 +180,11 @@ namespace KustoPreForgeLib
         }
         #endregion
 
-        private void CheckIfSameBuffer(BufferFragment other)
+        #region IDisposable
+        void IDisposable.Dispose()
         {
-            if (!object.ReferenceEquals(_buffer, other._buffer))
-            {
-                throw new ArgumentException(nameof(other), "Not related to same buffer");
-            }
+            _counters.ForEach(c => c.Decrement());
         }
+        #endregion
     }
 }

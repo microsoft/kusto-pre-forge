@@ -20,7 +20,13 @@ namespace KustoPreForgeLib
 
         public void Decrement()
         {
-            if (Interlocked.Decrement(ref _counter) == 0)
+            var newCounter = Interlocked.Decrement(ref _counter);
+
+            if (newCounter < 0)
+            {
+                throw new InvalidOperationException("Counter is now under zero");
+            }
+            if (newCounter == 0)
             {
                 _taskSource.SetResult();
             }
