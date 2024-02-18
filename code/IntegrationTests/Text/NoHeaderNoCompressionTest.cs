@@ -18,7 +18,7 @@ namespace IntegrationTests.Text
 
             var result = await QueryOneRowAsync(
                 $@"
-let Data = TextNoHeaderNoCompression
+let Data = {TableName}
     | project Csv=parse_csv(Text)
     | project Id=tolong(Csv[0]), Timestamp=todatetime(Csv[1]), Level=tostring(Csv[2]);
 let IdCardinality = toscalar(Data
