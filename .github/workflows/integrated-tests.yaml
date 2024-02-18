@@ -38,8 +38,9 @@ jobs:
         clusterIngestUri=$(az kusto cluster list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].dataIngestionUri" -o tsv)
         echo "Cluster Ingestion Uri:  $clusterIngestUri"
         # Fetch storage
-        landerFolderUri=$(az storage account list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].primaryEndpoints.blob" -o tsv)
-        echo "Landing folder URI:  $landerFolderUri/integrated-tests"
+        landerAccountUri=$(az storage account list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].primaryEndpoints.blob" -o tsv)
+        landerFolderUri="${landerAccountUri}integrated-tests"
+        echo "Landing folder URI:  $landerFolderUri"
         # Environment variables
         echo "BlobLandingFolder=$landerFolderUri" >> $GITHUB_ENV
         echo "KustoIngestUri=$clusterIngestUri" >> $GITHUB_ENV
