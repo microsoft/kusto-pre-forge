@@ -2,23 +2,27 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal class BufferFragment : IEnumerable<byte>
+    internal class BufferFragment : IEnumerable<byte>//, IDisposable
     {
+        private readonly ThreadSafeCounter _counter;
         private readonly byte[] _buffer;
         private readonly int _offset;
 
         #region Constructors
         private BufferFragment(
+            ThreadSafeCounter counter,
             byte[] buffer,
             int offset,
             int length)
         {
+            _counter = counter;
             _buffer = buffer;
             _offset = offset;
             Length = length;
@@ -36,12 +40,13 @@ namespace KustoPreForgeLib
             }
             else
             {
-                return new BufferFragment(new byte[length], 0, length);
+                return new BufferFragment(new ThreadSafeCounter(), new byte[length], 0, length);
             }
         }
         #endregion
 
-        public static BufferFragment Empty { get; } = new BufferFragment(new byte[0], 0, 0);
+        public static BufferFragment Empty { get; } =
+            new BufferFragment(new ThreadSafeCounter(), new byte[0], 0, 0);
 
         public int Length { get; }
 
@@ -101,11 +106,11 @@ namespace KustoPreForgeLib
 
                 if (end == other._offset)
                 {
-                    return new BufferFragment(_buffer, _offset, Length + other.Length);
+                    return new BufferFragment(new ThreadSafeCounter(), _buffer, _offset, Length + other.Length);
                 }
                 else if (otherEnd == _offset)
                 {
-                    return new BufferFragment(_buffer, other._offset, Length + other.Length);
+                    return new BufferFragment(new ThreadSafeCounter(), _buffer, other._offset, Length + other.Length);
                 }
                 else
                 {
@@ -181,7 +186,7 @@ namespace KustoPreForgeLib
             }
             else
             {
-                return new BufferFragment(_buffer, _offset, index);
+                return new BufferFragment(_counter, _buffer, _offset, index);
             }
         }
 
@@ -205,6 +210,7 @@ namespace KustoPreForgeLib
             else
             {
                 return new BufferFragment(
+                    _counter,
                     _buffer,
                     (_offset + index + 1) % _buffer.Length,
                     Length - index - 1);
