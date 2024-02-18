@@ -7,15 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.Text
+namespace KustoPreForgeLib
 {
     internal class BufferFragment : IEnumerable<byte>
     {
-        #region Inner Types
-
-        //public record MemoryBlock(byte[] Buffer, int Offset, int Length);
-        #endregion
-
         private readonly byte[] _buffer;
         private readonly int _offset;
 
