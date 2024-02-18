@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal static class AsyncPageableHelper
+    public static class AsyncPageableHelper
     {
         public static async Task<IImmutableList<T>> ToListAsync<T>(
             this AsyncPageable<T> pageable,

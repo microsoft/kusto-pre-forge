@@ -1,0 +1,23 @@
+.create-or-alter function GenerateLogData() {
+    let IdRange = 10000000;
+    let TextLengthMin = 30;
+    let TextLengthMax = 150;
+    let LetterList = dynamic(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', ' ']);
+    let ActivityIds = toscalar(range ActivityId from 1 to 25 step 1
+        | extend ActivityId=new_guid()
+        | summarize make_list(ActivityId));
+    range Id from 1 to IdRange step 1
+    | extend Array=range(0,TextLengthMin+rand(TextLengthMax-TextLengthMin),1)
+    | mv-apply Element=Array to typeof(int) on 
+    (
+        extend Letter = LetterList[toint(rand(27))]
+        | summarize Letters=make_list(Letter)
+    )
+    | extend Text=strcat_array(Letters, '')
+    | extend LevelRand = rand(100)
+    | extend Level=case(LevelRand<60, "Information", LevelRand <90, "Warning", "Error")
+    | extend Timestamp = now() - 1s*(IdRange-Id)
+    | extend Node = strcat("Machine", toint(rand(25)))
+    | extend ActivityId = ActivityIds[toint(rand(array_length(ActivityIds)))]
+    | project Id, Timestamp, Level, Node, ActivityId, Text
+}
