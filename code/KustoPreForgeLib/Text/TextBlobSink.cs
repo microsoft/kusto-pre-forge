@@ -10,7 +10,7 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.LineBased
+namespace KustoPreForgeLib.Text
 {
     internal class TextBlobSink : TextStreamSinkBase
     {

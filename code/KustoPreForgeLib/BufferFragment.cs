@@ -10,27 +10,29 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal class BufferFragment : IEnumerable<byte>, IDisposable
+    internal class BufferFragment : IEnumerable<byte>
     {
-        private readonly IImmutableList<ReferenceCounter> _counters;
         private readonly BufferSubset _bufferSubset;
+        private readonly MemoryTracker _memoryTracker;
 
         #region Constructors
-        public BufferFragment(ReferenceCounter counter, BufferSubset bufferSubset)
-            : this(new[] { counter }, bufferSubset)
+        private BufferFragment(BufferSubset bufferSubset, MemoryTracker memoryTracker)
         {
+            _bufferSubset = bufferSubset;
+            _memoryTracker = memoryTracker;
         }
 
-        private  BufferFragment(IEnumerable<ReferenceCounter> counters, BufferSubset bufferSubset)
+        public static BufferFragment Create(int size)
         {
-            _counters = counters.ToImmutableArray();
-            _counters.ForEach(c => c.Increment());
-            _bufferSubset = bufferSubset;
+            return new BufferFragment(
+                new BufferSubset(new byte[size], 0, size),
+                new MemoryTracker());
         }
         #endregion
 
-        public static BufferFragment Empty { get; } =
-            new BufferFragment(new ReferenceCounter[0], BufferSubset.Empty);
+        public static BufferFragment Empty { get; } = new BufferFragment(
+            BufferSubset.Empty,
+            new MemoryTracker());
 
         public int Length => _bufferSubset.Length;
 
@@ -51,14 +53,10 @@ namespace KustoPreForgeLib
         {
             if (Length == 0)
             {
-                other._counters.ForEach(c => c.Increment());
-
                 return other;
             }
             else if (other.Length == 0)
             {
-                _counters.ForEach(c => c.Increment());
-
                 return this;
             }
             else
@@ -74,20 +72,20 @@ namespace KustoPreForgeLib
                 if (end == other._bufferSubset.Offset)
                 {
                     return new BufferFragment(
-                        _counters.Concat(other._counters),
                         new BufferSubset(
                             _bufferSubset.Buffer,
                             _bufferSubset.Offset,
-                            Length + other.Length));
+                            Length + other.Length),
+                        _memoryTracker);
                 }
                 else if (otherEnd == _bufferSubset.Offset)
                 {
                     return new BufferFragment(
-                        _counters.Concat(other._counters),
                         new BufferSubset(
                             _bufferSubset.Buffer,
                             other._bufferSubset.Offset,
-                            Length + other.Length));
+                            Length + other.Length),
+                        _memoryTracker);
                 }
                 else
                 {
@@ -98,10 +96,13 @@ namespace KustoPreForgeLib
         #endregion
 
         #region Splice
-        /// <summary>This includes the specified index and everything before.</summary>
+        /// <summary>
+        /// The left part includes the specified index and everything before while the right part
+        /// excludes the specified index and includes everything after.
+        /// </summary>
         /// <param name="index"></param>
         /// <returns></returns>
-        public BufferFragment SpliceBefore(int index)
+        public (BufferFragment Left, BufferFragment Right) Splice(int index)
         {
             if (index < 0 || index > Length)
             {
@@ -109,49 +110,25 @@ namespace KustoPreForgeLib
             }
             if (index == Length)
             {
-                _counters.ForEach(c => c.Increment());
-                
-                return this;
+                return (this, Empty);
             }
             else if (index == 0)
             {
-                return Empty;
+                return (Empty, this);
             }
             else
             {
-                return new BufferFragment(
-                    _counters,
-                    new BufferSubset(_bufferSubset.Buffer, _bufferSubset.Offset, index));
-            }
-        }
-
-        /// <summary>This excludes the specified index and includes everything after.</summary>
-        /// <param name="index"></param>
-        /// <returns></returns>
-        public BufferFragment SpliceAfter(int index)
-        {
-            if (index < -1 || index >= Length)
-            {
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
-            if (index == Length - 1)
-            {
-                return Empty;
-            }
-            else if (index == -1)
-            {
-                _counters.ForEach(c => c.Increment());
-
-                return this;
-            }
-            else
-            {
-                return new BufferFragment(
-                    _counters,
+                var left = new BufferFragment(
+                    new BufferSubset(_bufferSubset.Buffer, _bufferSubset.Offset, index),
+                    _memoryTracker);
+                var right = new BufferFragment(
                     new BufferSubset(
                         _bufferSubset.Buffer,
-                        (_bufferSubset.Offset + index + 1) % _bufferSubset.Buffer.Length,
-                        Length - index - 1));
+                        _bufferSubset.Offset + index,
+                        Length - index),
+                    _memoryTracker);
+
+                return (left, right);
             }
         }
         #endregion
@@ -173,10 +150,20 @@ namespace KustoPreForgeLib
         }
         #endregion
 
-        #region IDisposable
-        void IDisposable.Dispose()
+        #region Memory Tracking
+        public void Reserve()
         {
-            _counters.ForEach(c => c.Decrement());
+            _memoryTracker.Reserve(_bufferSubset.Offset, _bufferSubset.Length);
+        }
+
+        public void Release()
+        {
+            _memoryTracker.Release(_bufferSubset.Offset, _bufferSubset.Length);
+        }
+
+        public Task TrackAsync()
+        {
+            return _memoryTracker.TrackAsync(_bufferSubset.Offset, _bufferSubset.Length);
         }
         #endregion
     }

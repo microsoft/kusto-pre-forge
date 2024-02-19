@@ -10,7 +10,7 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.LineBased
+namespace KustoPreForgeLib.Text
 {
     /// <summary>Sink based on Stream (agnostic of the type of stream).</summary>
     internal abstract class TextStreamSinkBase : ITextSink
@@ -54,10 +54,10 @@ namespace KustoPreForgeLib.LineBased
                     }
                     do
                     {
-                        using (var fragment = fragmentResult.Item!)
-                        {
-                            await countingStream.WriteAsync(fragment.ToMemoryBlock());
-                        }
+                        var fragment = fragmentResult.Item!;
+
+                        await countingStream.WriteAsync(fragment.ToMemoryBlock());
+                        fragment.Release();
                     }
                     while (countingStream.Position < Context.BlobSettings.MaxBytesPerShard
                     && !(fragmentResult = await fragmentQueue.DequeueAsync()).IsCompleted);

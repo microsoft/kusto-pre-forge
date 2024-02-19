@@ -13,15 +13,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.LineBased
+namespace KustoPreForgeLib.Text
 {
     /// <summary>Reads data from Azure Blob and sends it to sink.</summary>
     internal class TextSource : ISource
     {
-        #region Inner Types
-        private record BufferQueueItem(BufferSubset bufferSubset, ReferenceCounter counter);
-        #endregion
-
         private const int BUFFER_COUNT = 4;
         private const int BUFFER_SIZE = 50 * 1024 * 1024;
 
@@ -45,8 +41,9 @@ namespace KustoPreForgeLib.LineBased
             {
                 BufferSize = BUFFER_COUNT * BUFFER_SIZE
             };
-            var buffer = new byte[BUFFER_COUNT * BUFFER_SIZE];
-            var bufferQueue = InitBufferQueue(buffer);
+            var bufferQueue = new Queue<BufferFragment>(
+                Enumerable.Range(0, BUFFER_COUNT)
+                .Select(i => BufferFragment.Create(BUFFER_SIZE)));
             var fragmentQueue = new WaitingQueue<BufferFragment>() as IWaitingQueue<BufferFragment>;
             var sinkTask = Task.Run(() => _sink.ProcessAsync(fragmentQueue));
 
@@ -56,19 +53,19 @@ namespace KustoPreForgeLib.LineBased
             {
                 while (true)
                 {
-                    var queueItem = bufferQueue.Dequeue();
+                    var fragment = bufferQueue.Dequeue();
 
-                    //  Await for buffer to be released by everyone
-                    await queueItem.counter.BackToZeroTask;
+                    //  Await for buffer to be released
+                    await fragment.TrackAsync();
 
-                    var newCounter = new ReferenceCounter();
-                    var fragment = new BufferFragment(newCounter, queueItem.bufferSubset);
                     var size = await uncompressedStream.ReadAsync(fragment.ToMemoryBlock());
 
-                    bufferQueue.Enqueue(new BufferQueueItem(queueItem.bufferSubset, newCounter));
                     if (size > 0)
                     {
-                        fragmentQueue.Enqueue(fragment.SpliceAfter(size));
+                        var croppedFragment = fragment.Splice(size).Right;
+
+                        croppedFragment.Reserve();
+                        fragmentQueue.Enqueue(croppedFragment);
                     }
                     if (size < fragment.Length)
                     {
@@ -78,22 +75,6 @@ namespace KustoPreForgeLib.LineBased
                     }
                 }
             }
-        }
-
-        private static Queue<BufferQueueItem> InitBufferQueue(byte[] buffer)
-        {
-            var bufferQueueItems = Enumerable.Range(0, BUFFER_COUNT)
-                .Select(i => new BufferQueueItem(
-                    new BufferSubset(buffer, i * BUFFER_SIZE, BUFFER_SIZE),
-                    new ReferenceCounter()))
-                .ToImmutableArray();
-            var queue = new Queue<BufferQueueItem>(bufferQueueItems);
-
-            //  Fake the buffer have been used and now ready
-            bufferQueueItems.ForEach(i => i.counter.Increment());
-            bufferQueueItems.ForEach(i => i.counter.Decrement());
-
-            return queue;
         }
 
         private Stream UncompressStream(Stream readStream)

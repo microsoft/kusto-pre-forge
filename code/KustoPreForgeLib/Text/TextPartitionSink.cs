@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.LineBased
+namespace KustoPreForgeLib.Text
 {
     /// <summary>Distributes the data among many partitions.</summary>
     internal class TextPartitionSink : ITextSink

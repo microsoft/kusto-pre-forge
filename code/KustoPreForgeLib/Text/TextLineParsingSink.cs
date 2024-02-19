@@ -1,10 +1,8 @@
-﻿using KustoPreForgeLib.LineBased;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static Kusto.Cloud.Platform.Utils.CachedBufferEncoder;
 
 namespace KustoPreForgeLib.Text
 {
@@ -48,6 +46,7 @@ namespace KustoPreForgeLib.Text
                     var i = 0;
                     var lastNewLineIndex = 0;
                     var currentFragment = inputResult.Item!;
+                    var croppedFragment = currentFragment;
 
                     foreach (var b in currentFragment)
                     {
@@ -58,13 +57,12 @@ namespace KustoPreForgeLib.Text
                             {   //  First line ever
                                 if (_propagateHeader)
                                 {
-                                    var originalFragment = currentFragment as IDisposable;
+                                    var headerFragment = currentFragment.Splice(i).Left;
 
-                                    nextSink = _nextSinkFactory(
-                                        currentFragment.SpliceBefore(i).ToArray());
+                                    nextSink = _nextSinkFactory(headerFragment.ToArray());
+                                    headerFragment.Release();
                                     //  Remove the header from the fragment, not to write it twice
-                                    currentFragment = currentFragment.SpliceAfter(i);
-                                    originalFragment.Dispose();
+                                    croppedFragment = currentFragment.Splice(i).Right;
                                 }
                                 else
                                 {
@@ -74,8 +72,7 @@ namespace KustoPreForgeLib.Text
                         }
                         ++i;
                     }
-                    var outputFragment = remainingFragment.TryMerge(currentFragment);
-                    var originalRemainingFragment = remainingFragment as IDisposable;
+                    var outputFragment = remainingFragment.TryMerge(croppedFragment);
 
                     if (outputFragment == null)
                     {
@@ -86,9 +83,7 @@ namespace KustoPreForgeLib.Text
                         throw new InvalidDataException("No new line in a block");
                     }
                     outputFragmentQueue.Enqueue(outputFragment);
-                    remainingFragment = currentFragment.SpliceAfter(lastNewLineIndex);
-                    (currentFragment as IDisposable).Dispose();
-                    originalRemainingFragment.Dispose();
+                    remainingFragment = croppedFragment.Splice(lastNewLineIndex).Right;
                 }
             }
         }
