@@ -11,7 +11,6 @@ namespace KustoPreForgeLib.LineBased
     {
         Task ProcessAsync(
             Memory<byte>? header,
-            IWaitingQueue<BufferFragment> fragmentQueue,
-            IWaitingQueue<BufferFragment> releaseQueue);
+            IWaitingQueue<BufferFragment> fragmentQueue);
     }
 }

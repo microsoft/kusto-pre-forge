@@ -1,5 +1,6 @@
 ﻿using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
+using Kusto.Cloud.Platform.Utils;
 using Kusto.Data.Common;
 using KustoPreForgeLib.Text;
 using System;
@@ -16,14 +17,12 @@ namespace KustoPreForgeLib.LineBased
 {
     internal class TextSource : ISource
     {
-#if DEBUG
-        private const int STORAGE_BUFFER_SIZE = 10 * 1024 * 1024;
-        private const int MIN_STORAGE_FETCH = 1 * 1024 * 1024;
-#else
-        private const int STORAGE_BUFFER_SIZE = 100 * 1024 * 1024;
-        private const int MIN_STORAGE_FETCH = 1 * 1024 * 1024;
-#endif
-        private const int BUFFER_SIZE = 10 * 1024 * 1024;
+        #region Inner Types
+        private record BufferQueueItem(BufferSubset bufferSubset, ThreadSafeCounter counter);
+        #endregion
+
+        private const int BUFFER_COUNT = 4;
+        private const int BUFFER_SIZE = 50 * 1024 * 1024;
 
         private readonly BlockBlobClient _sourceBlob;
         private readonly DataSourceCompressionType _compression;
@@ -43,18 +42,12 @@ namespace KustoPreForgeLib.LineBased
         {
             var readOptions = new BlobOpenReadOptions(false)
             {
-                BufferSize = STORAGE_BUFFER_SIZE
+                BufferSize = BUFFER_COUNT * BUFFER_SIZE
             };
-            var buffer = BufferFragment.Create(BUFFER_SIZE);
-            var bufferAvailable = buffer;
-            var fragmentList = (IEnumerable<BufferFragment>)ImmutableArray<BufferFragment>.Empty;
+            var buffer = new byte[BUFFER_COUNT * BUFFER_SIZE];
+            var bufferQueue = InitBufferQueue(buffer);
             var fragmentQueue = new WaitingQueue<BufferFragment>() as IWaitingQueue<BufferFragment>;
-            var releaseQueue = new WaitingQueue<BufferFragment>() as IWaitingQueue<BufferFragment>;
-            var sinkTask = Task.Run(() => _sink.ProcessAsync(
-                null,
-                fragmentQueue,
-                releaseQueue));
-            var lastFragment = (BufferFragment?)null;
+            var sinkTask = Task.Run(() => _sink.ProcessAsync(null, fragmentQueue));
 
             Console.WriteLine($"Reading '{_sourceBlob.Uri}'");
             using (var readStream = await _sourceBlob.OpenReadAsync(readOptions))
@@ -62,53 +55,44 @@ namespace KustoPreForgeLib.LineBased
             {
                 while (true)
                 {
-                    if (bufferAvailable.Length >= MIN_STORAGE_FETCH
-                        || bufferAvailable.GetMemoryBlocks().Count() > 1)
+                    var queueItem = bufferQueue.Dequeue();
+
+                    //  Await for buffer to be released by everyone
+                    await queueItem.counter.BackToZeroTask;
+
+                    var newCounter = new ThreadSafeCounter();
+                    var fragment = new BufferFragment(newCounter, queueItem.bufferSubset);
+                    var size = await uncompressedStream.ReadAsync(fragment.ToMemoryBlock());
+
+                    bufferQueue.Enqueue(new BufferQueueItem(queueItem.bufferSubset, newCounter));
+                    if (size > 0)
                     {
-                        var readLength = await uncompressedStream.ReadAsync(
-                            bufferAvailable.GetMemoryBlocks().First());
-
-                        if (readLength == 0)
-                        {
-                            fragmentQueue.Complete();
-                            await sinkTask;
-                            return;
-                        }
-                        else
-                        {
-                            var currentFragment = bufferAvailable.SpliceBefore(readLength);
-
-                            fragmentQueue.Enqueue(currentFragment);
-                            lastFragment = currentFragment;
-                            bufferAvailable = bufferAvailable.SpliceAfter(readLength - 1);
-                        }
+                        fragmentQueue.Enqueue(fragment.SpliceAfter(size));
                     }
-                    while (releaseQueue.HasData || bufferAvailable.Length < MIN_STORAGE_FETCH)
+                    if (size < fragment.Length)
                     {
-                        var fragmentResult = await TaskHelper.AwaitAsync(
-                            releaseQueue.DequeueAsync(),
-                            sinkTask);
-
-                        if (fragmentResult.IsCompleted)
-                        {
-                            throw new NotSupportedException(
-                                "releaseQueue should never be observed as completed");
-                        }
-                        fragmentList = fragmentList.Prepend(fragmentResult.Item!);
-
-                        var bundle = bufferAvailable.TryMerge(fragmentList);
-
-                        if (lastFragment == null
-                            //  Make sure we merge a fragment that is contiguous with last one
-                            || lastFragment.IsContiguouslyBefore(bundle.Fragment))
-                        {
-                            bufferAvailable = bundle.Fragment;
-                            fragmentList = bundle.List;
-                            lastFragment = null;
-                        }
+                        fragmentQueue.Complete();
+                        await sinkTask;
+                        return;
                     }
                 }
             }
+        }
+
+        private static Queue<BufferQueueItem> InitBufferQueue(byte[] buffer)
+        {
+            var bufferQueueItems = Enumerable.Range(0, BUFFER_COUNT)
+                .Select(i => new BufferQueueItem(
+                    new BufferSubset(buffer, i * BUFFER_SIZE, BUFFER_SIZE),
+                    new ThreadSafeCounter()))
+                .ToImmutableArray();
+            var queue = new Queue<BufferQueueItem>(bufferQueueItems);
+
+            //  Fake the buffer have been used and now ready
+            bufferQueueItems.ForEach(i => i.counter.Increment());
+            bufferQueueItems.ForEach(i => i.counter.Decrement());
+
+            return queue;
         }
 
         private Stream UncompressStream(Stream readStream)

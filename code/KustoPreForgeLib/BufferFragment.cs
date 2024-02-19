@@ -16,31 +16,16 @@ namespace KustoPreForgeLib
         private readonly BufferSubset _bufferSubset;
 
         #region Constructors
-        private BufferFragment(
-            IEnumerable<ThreadSafeCounter> counters,
-            BufferSubset bufferSubset)
+        public BufferFragment(ThreadSafeCounter counter, BufferSubset bufferSubset)
+            : this(new[] { counter }, bufferSubset)
+        {
+        }
+
+        private  BufferFragment(IEnumerable<ThreadSafeCounter> counters, BufferSubset bufferSubset)
         {
             _counters = counters.ToImmutableArray();
             _counters.ForEach(c => c.Increment());
             _bufferSubset = bufferSubset;
-        }
-
-        public static BufferFragment Create(int length)
-        {
-            if (length < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(length), length.ToString());
-            }
-            else if (length == 0)
-            {
-                return Empty;
-            }
-            else
-            {
-                return new BufferFragment(
-                    new ThreadSafeCounter[] { new ThreadSafeCounter() },
-                    new BufferSubset(new byte[length], 0, length));
-            }
         }
         #endregion
 
@@ -51,7 +36,7 @@ namespace KustoPreForgeLib
 
         public bool Any() => Length > 0;
 
-        public Memory<byte> GetMemoryBlock()
+        public Memory<byte> ToMemoryBlock()
         {
             return new Memory<byte>(_bufferSubset.Buffer, _bufferSubset.Offset, Length);
         }
