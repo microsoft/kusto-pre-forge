@@ -12,16 +12,16 @@ namespace KustoPreForgeLib
 {
     internal class BufferFragment : IEnumerable<byte>, IDisposable
     {
-        private readonly IImmutableList<ThreadSafeCounter> _counters;
+        private readonly IImmutableList<ReferenceCounter> _counters;
         private readonly BufferSubset _bufferSubset;
 
         #region Constructors
-        public BufferFragment(ThreadSafeCounter counter, BufferSubset bufferSubset)
+        public BufferFragment(ReferenceCounter counter, BufferSubset bufferSubset)
             : this(new[] { counter }, bufferSubset)
         {
         }
 
-        private  BufferFragment(IEnumerable<ThreadSafeCounter> counters, BufferSubset bufferSubset)
+        private  BufferFragment(IEnumerable<ReferenceCounter> counters, BufferSubset bufferSubset)
         {
             _counters = counters.ToImmutableArray();
             _counters.ForEach(c => c.Increment());
@@ -30,7 +30,7 @@ namespace KustoPreForgeLib
         #endregion
 
         public static BufferFragment Empty { get; } =
-            new BufferFragment(new ThreadSafeCounter[0], BufferSubset.Empty);
+            new BufferFragment(new ReferenceCounter[0], BufferSubset.Empty);
 
         public int Length => _bufferSubset.Length;
 
@@ -51,10 +51,14 @@ namespace KustoPreForgeLib
         {
             if (Length == 0)
             {
+                other._counters.ForEach(c => c.Increment());
+
                 return other;
             }
             else if (other.Length == 0)
             {
+                _counters.ForEach(c => c.Increment());
+
                 return this;
             }
             else
@@ -105,6 +109,8 @@ namespace KustoPreForgeLib
             }
             if (index == Length)
             {
+                _counters.ForEach(c => c.Increment());
+                
                 return this;
             }
             else if (index == 0)
@@ -134,6 +140,8 @@ namespace KustoPreForgeLib
             }
             else if (index == -1)
             {
+                _counters.ForEach(c => c.Increment());
+
                 return this;
             }
             else

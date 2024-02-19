@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal class ThreadSafeCounter
+    internal class ReferenceCounter
     {
         private readonly TaskCompletionSource _taskSource = new();
         private volatile int _counter = 0;

@@ -16,10 +16,11 @@ namespace KustoPreForgeLib.LineBased
         private readonly BlobClient _shardBlobClient;
 
         public TextKustoSink(
+            Memory<byte>? header,
             RunningContext context,
             string shardId,
             string blobNamePrefix)
-            : base(context, shardId)
+            : base(header, context, shardId)
         {
             var shardName =
                 $"{blobNamePrefix}-{shardId}.txt{GetCompressionExtension()}";

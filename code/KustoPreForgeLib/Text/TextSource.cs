@@ -15,10 +15,11 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.LineBased
 {
+    /// <summary>Reads data from Azure Blob and sends it to sink.</summary>
     internal class TextSource : ISource
     {
         #region Inner Types
-        private record BufferQueueItem(BufferSubset bufferSubset, ThreadSafeCounter counter);
+        private record BufferQueueItem(BufferSubset bufferSubset, ReferenceCounter counter);
         #endregion
 
         private const int BUFFER_COUNT = 4;
@@ -47,7 +48,7 @@ namespace KustoPreForgeLib.LineBased
             var buffer = new byte[BUFFER_COUNT * BUFFER_SIZE];
             var bufferQueue = InitBufferQueue(buffer);
             var fragmentQueue = new WaitingQueue<BufferFragment>() as IWaitingQueue<BufferFragment>;
-            var sinkTask = Task.Run(() => _sink.ProcessAsync(null, fragmentQueue));
+            var sinkTask = Task.Run(() => _sink.ProcessAsync(fragmentQueue));
 
             Console.WriteLine($"Reading '{_sourceBlob.Uri}'");
             using (var readStream = await _sourceBlob.OpenReadAsync(readOptions))
@@ -60,7 +61,7 @@ namespace KustoPreForgeLib.LineBased
                     //  Await for buffer to be released by everyone
                     await queueItem.counter.BackToZeroTask;
 
-                    var newCounter = new ThreadSafeCounter();
+                    var newCounter = new ReferenceCounter();
                     var fragment = new BufferFragment(newCounter, queueItem.bufferSubset);
                     var size = await uncompressedStream.ReadAsync(fragment.ToMemoryBlock());
 
@@ -84,7 +85,7 @@ namespace KustoPreForgeLib.LineBased
             var bufferQueueItems = Enumerable.Range(0, BUFFER_COUNT)
                 .Select(i => new BufferQueueItem(
                     new BufferSubset(buffer, i * BUFFER_SIZE, BUFFER_SIZE),
-                    new ThreadSafeCounter()))
+                    new ReferenceCounter()))
                 .ToImmutableArray();
             var queue = new Queue<BufferQueueItem>(bufferQueueItems);
 

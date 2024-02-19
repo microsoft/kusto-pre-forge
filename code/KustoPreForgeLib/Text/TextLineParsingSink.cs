@@ -8,97 +8,87 @@ using static Kusto.Cloud.Platform.Utils.CachedBufferEncoder;
 
 namespace KustoPreForgeLib.Text
 {
+    /// <summary>Take arbitrary blocks and repackage them into blocks cutting at new lines.</summary>
     internal class TextLineParsingSink : ITextSink
     {
         private const int MIN_SINK_BUFFER_SIZE = 1024 * 1024;
 
-        private readonly ITextSink _nextSink;
+        private readonly Func<Memory<byte>?, ITextSink> _nextSinkFactory;
         private readonly bool _propagateHeader;
 
-        public TextLineParsingSink(ITextSink nextSink, bool propagateHeader)
+        public TextLineParsingSink(
+            Func<Memory<byte>?, ITextSink> nextSinkFactory,
+            bool propagateHeader)
         {
-            _nextSink = nextSink;
+            _nextSinkFactory = nextSinkFactory;
             _propagateHeader = propagateHeader;
         }
 
-        async Task ITextSink.ProcessAsync(
-            Memory<byte>? header,
-            IWaitingQueue<BufferFragment> inputFragmentQueue,
-            IWaitingQueue<BufferFragment> releaseQueue)
+        async Task ITextSink.ProcessAsync(IWaitingQueue<BufferFragment> inputFragmentQueue)
         {
-            if (header != null)
-            {
-                throw new ArgumentOutOfRangeException(nameof(header));
-            }
-
             var outputFragmentQueue =
                 new WaitingQueue<BufferFragment>() as IWaitingQueue<BufferFragment>;
-            var toPushFragment = BufferFragment.Empty;
-            var sinkTask = _propagateHeader
-                ? null
-                : _nextSink.ProcessAsync(null, outputFragmentQueue, releaseQueue);
+            var remainingFragment = BufferFragment.Empty;
+            ITextSink? nextSink = null;
 
             while (true)
             {
-                var inputResult = await TaskHelper.AwaitAsync(
-                    inputFragmentQueue.DequeueAsync(),
-                    sinkTask);
+                var inputResult = await inputFragmentQueue.DequeueAsync();
 
                 if (inputResult.IsCompleted)
                 {
                     //  Push what is left (in case no \n at the end of line)
-                    PushFragment(outputFragmentQueue, toPushFragment);
+                    PushFragment(outputFragmentQueue, remainingFragment);
                     outputFragmentQueue.Complete();
-                    if (sinkTask != null)
-                    {
-                        await sinkTask;
-                    }
 
                     return;
                 }
                 else
                 {
                     var i = 0;
-                    var workingFragment = inputResult.Item!;
-                    var remainingFragment = workingFragment;
+                    var lastNewLineIndex = 0;
+                    var currentFragment = inputResult.Item!;
 
-                    foreach (var b in workingFragment)
+                    foreach (var b in currentFragment)
                     {
                         if (b == '\n')
-                        {   //  sinkTask==null => has header
-                            if (toPushFragment.Length + i >= MIN_SINK_BUFFER_SIZE || sinkTask == null)
-                            {
-                                toPushFragment = toPushFragment.Merge(remainingFragment.SpliceBefore(i + 1));
-                                //  Remove it from remaining Fragment
-                                remainingFragment = remainingFragment.SpliceAfter(i);
-                                i = 0;
-                                if (sinkTask == null)
+                        {
+                            lastNewLineIndex = i;
+                            if (nextSink == null)
+                            {   //  First line ever
+                                if (_propagateHeader)
                                 {
-                                    //  Init sink task with header
-                                    sinkTask = _nextSink.ProcessAsync(
-                                        toPushFragment.ToArray(),
-                                        outputFragmentQueue,
-                                        releaseQueue);
-                                    //  We release the bytes immediately as they are kept in memory
-                                    releaseQueue.Enqueue(toPushFragment);
+                                    var originalFragment = currentFragment as IDisposable;
+
+                                    nextSink = _nextSinkFactory(
+                                        currentFragment.SpliceBefore(i).ToArray());
+                                    //  Remove the header from the fragment, not to write it twice
+                                    currentFragment = currentFragment.SpliceAfter(i);
+                                    originalFragment.Dispose();
                                 }
                                 else
                                 {
-                                    PushFragment(outputFragmentQueue, toPushFragment);
+                                    nextSink = _nextSinkFactory(null);
                                 }
-                                toPushFragment = BufferFragment.Empty;
-                            }
-                            else
-                            {
-                                ++i;
                             }
                         }
-                        else
-                        {
-                            ++i;
-                        }
+                        ++i;
                     }
-                    toPushFragment = toPushFragment.Merge(remainingFragment);
+                    var outputFragment = remainingFragment.TryMerge(currentFragment);
+                    var originalRemainingFragment = remainingFragment as IDisposable;
+
+                    if (outputFragment == null)
+                    {
+                        throw new InvalidOperationException("Can't merge fragments");
+                    }
+                    if (lastNewLineIndex == 0)
+                    {
+                        throw new InvalidDataException("No new line in a block");
+                    }
+                    outputFragmentQueue.Enqueue(outputFragment);
+                    remainingFragment = currentFragment.SpliceAfter(lastNewLineIndex);
+                    (currentFragment as IDisposable).Dispose();
+                    originalRemainingFragment.Dispose();
                 }
             }
         }

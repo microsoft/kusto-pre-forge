@@ -35,15 +35,14 @@ namespace KustoPreForgeLib
             {
                 case DataSourceFormat.txt:
                     {
-                        var subSinkFactory = GetSubSinkFactory(context);
-                        var splitSink = new TextSplitSink(subSinkFactory);
-                        var parsingSink = new TextLineParsingSink(
-                            splitSink,
+                        var streamSinkFactory = GetStreamSinkFactory(context);
+                        var lineParsingSink = new TextLineParsingSink(
+                            (header) => new TextPartitionSink(header, streamSinkFactory),
                             context.BlobSettings.HasHeaders);
                         var source = new TextSource(
                             context.SourceBlobClient!,
                             context.BlobSettings.InputCompression,
-                            parsingSink);
+                            lineParsingSink);
 
                         return new SingleSourceEtl(source);
                     }
@@ -53,17 +52,18 @@ namespace KustoPreForgeLib
             }
         }
 
-        private static Func<string, ITextSink> GetSubSinkFactory(RunningContext context)
+        private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
+            RunningContext context)
         {
             if (context.IngestClient == null)
             {
-                return (shardIndex) => new TextBlobSink(context, shardIndex);
+                return (header, shardIndex) => new TextBlobSink(header, context, shardIndex);
             }
             else
             {
                 var blobNamePrefix = Guid.NewGuid().ToString();
 
-                return (shardIndex) => new TextKustoSink(context, shardIndex, blobNamePrefix);
+                return (header, shardIndex) => new TextKustoSink(header, context, shardIndex, blobNamePrefix);
             }
         }
     }

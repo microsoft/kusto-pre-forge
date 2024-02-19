@@ -9,8 +9,6 @@ namespace KustoPreForgeLib.LineBased
 {
     internal interface ITextSink
     {
-        Task ProcessAsync(
-            Memory<byte>? header,
-            IWaitingQueue<BufferFragment> fragmentQueue);
+        Task ProcessAsync(IWaitingQueue<BufferFragment> fragmentQueue);
     }
 }

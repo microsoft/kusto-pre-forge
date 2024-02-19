@@ -9,7 +9,8 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.LineBased
 {
-    internal class TextSplitSink : ITextSink
+    /// <summary>Distributes the data among many partitions.</summary>
+    internal class TextPartitionSink : ITextSink
     {
         #region Inner types
         private class ThreadSafeCounter
@@ -23,25 +24,21 @@ namespace KustoPreForgeLib.LineBased
         }
         #endregion
 
-        private readonly Func<string, ITextSink> _sinkFactory;
+        private readonly Memory<byte>? _header;
+        private readonly Func<Memory<byte>?, string, ITextSink> _sinkFactory;
 
-        public TextSplitSink(Func<string, ITextSink> sinkFactory)
+        public TextPartitionSink(
+            Memory<byte>? header, Func<Memory<byte>?, string, ITextSink> sinkFactory)
         {
+            _header = header;
             _sinkFactory = sinkFactory;
         }
 
-        async Task ITextSink.ProcessAsync(
-            Memory<byte>? header,
-            IWaitingQueue<BufferFragment> fragmentQueue,
-            IWaitingQueue<BufferFragment> releaseQueue)
+        async Task ITextSink.ProcessAsync(IWaitingQueue<BufferFragment> fragmentQueue)
         {
             var counter = new ThreadSafeCounter();
             var processingTasks = Enumerable.Range(0, 2 * Environment.ProcessorCount + 1)
-                .Select(i => ProcessFragmentsAsync(
-                    counter,
-                    header,
-                    fragmentQueue,
-                    releaseQueue))
+                .Select(i => ProcessFragmentsAsync(counter, fragmentQueue))
                 .ToImmutableArray();
 
             await Task.WhenAll(processingTasks);
@@ -49,15 +46,13 @@ namespace KustoPreForgeLib.LineBased
 
         private async Task ProcessFragmentsAsync(
             ThreadSafeCounter counter,
-            Memory<byte>? header,
-            IWaitingQueue<BufferFragment> fragmentQueue,
-            IWaitingQueue<BufferFragment> releaseQueue)
+            IWaitingQueue<BufferFragment> fragmentQueue)
         {
             while (!fragmentQueue.HasCompleted)
             {
-                var sink = _sinkFactory(counter.GetNextCounter().ToString("00000"));
+                var sink = _sinkFactory(_header, counter.GetNextCounter().ToString("00000"));
 
-                await sink.ProcessAsync(header, fragmentQueue, releaseQueue);
+                await sink.ProcessAsync(fragmentQueue);
             }
         }
     }

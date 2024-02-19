@@ -1,7 +1,5 @@
-﻿using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
+﻿using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
-using Kusto.Data.Common;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,8 +14,8 @@ namespace KustoPreForgeLib.LineBased
 {
     internal class TextBlobSink : TextStreamSinkBase
     {
-        public TextBlobSink(RunningContext context, string shardId)
-            : base(context, shardId)
+        public TextBlobSink(Memory<byte>? header, RunningContext context, string shardId)
+            : base(header, context, shardId)
         {
         }
 

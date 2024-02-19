@@ -25,8 +25,8 @@ namespace KustoPreForgeLib
             //  Scan background tasks for faults
             foreach (var task in realBackgroundTasks)
             {
-                if (task.IsFaulted)
-                {   //  Observe exception
+                if (task.IsCompleted)
+                {   //  Observe end or exception
                     await task;
                 }
             }

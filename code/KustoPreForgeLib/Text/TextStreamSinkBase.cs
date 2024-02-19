@@ -12,17 +12,20 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.LineBased
 {
+    /// <summary>Sink based on Stream (agnostic of the type of stream).</summary>
     internal abstract class TextStreamSinkBase : ITextSink
     {
         protected const int WRITING_BUFFER_SIZE = 20 * 1024 * 1024;
+        private readonly Memory<byte>? _header;
 
-        public TextStreamSinkBase(RunningContext context, string shardId)
+        public TextStreamSinkBase(Memory<byte>? header, RunningContext context, string shardId)
         {
             if (context.SourceBlobClient == null)
             {
                 throw new ArgumentNullException(nameof(context.SourceBlobClient));
             }
 
+            _header = header;
             Context = context;
             ShardId = shardId;
         }
@@ -31,10 +34,7 @@ namespace KustoPreForgeLib.LineBased
 
         protected string ShardId { get; }
 
-        async Task ITextSink.ProcessAsync(
-            Memory<byte>? header,
-            IWaitingQueue<BufferFragment> fragmentQueue,
-            IWaitingQueue<BufferFragment> releaseQueue)
+        async Task ITextSink.ProcessAsync(IWaitingQueue<BufferFragment> fragmentQueue)
         {
             var stopwatch = new Stopwatch();
 
@@ -44,23 +44,20 @@ namespace KustoPreForgeLib.LineBased
 
             if (!fragmentResult.IsCompleted)
             {
-                await using (var blobStream = await CreateOutputStreamAsync())
-                await using (var compressedStream = CompressedStream(blobStream))
+                await using (var outputStream = await CreateOutputStreamAsync())
+                await using (var compressedStream = CompressedStream(outputStream))
                 await using (var countingStream = new ByteCountingStream(compressedStream))
                 {
-                    if (header != null)
+                    if (_header != null)
                     {
-                        await countingStream.WriteAsync(header.Value);
+                        await countingStream.WriteAsync(_header.Value);
                     }
                     do
                     {
-                        var fragment = fragmentResult.Item!;
-
-                        foreach (var block in fragment.GetMemoryBlocks())
+                        using (var fragment = fragmentResult.Item!)
                         {
-                            await countingStream.WriteAsync(block);
+                            await countingStream.WriteAsync(fragment.ToMemoryBlock());
                         }
-                        releaseQueue.Enqueue(fragment);
                     }
                     while (countingStream.Position < Context.BlobSettings.MaxBytesPerShard
                     && !(fragmentResult = await fragmentQueue.DequeueAsync()).IsCompleted);
