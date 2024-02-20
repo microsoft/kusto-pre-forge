@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeServiceBus", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeConsole", "KustoPreForgeConsole\KustoPreForgeConsole.csproj", "{74617627-873B-4B2C-BC4B-D95B9BF421F9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntegrationTests", "IntegrationTests\IntegrationTests.csproj", "{D6001E24-6535-4A23-B670-E71E3C5141D6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IntegrationTests", "IntegrationTests\IntegrationTests.csproj", "{D6001E24-6535-4A23-B670-E71E3C5141D6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{FACB1F31-CC29-4E1C-840E-3126A8878857}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{D6001E24-6535-4A23-B670-E71E3C5141D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D6001E24-6535-4A23-B670-E71E3C5141D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D6001E24-6535-4A23-B670-E71E3C5141D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FACB1F31-CC29-4E1C-840E-3126A8878857}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FACB1F31-CC29-4E1C-840E-3126A8878857}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FACB1F31-CC29-4E1C-840E-3126A8878857}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FACB1F31-CC29-4E1C-840E-3126A8878857}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

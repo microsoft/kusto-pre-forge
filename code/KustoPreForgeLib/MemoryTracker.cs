@@ -48,6 +48,13 @@ namespace KustoPreForgeLib
         private readonly List<MemoryBlock> _reservedBlocks = new();
         private readonly List<Tracker> _trackers = new();
 
+        public bool IsAvailable(int offset, int length)
+        {
+            var testBlock = new MemoryBlock(offset, length);
+
+            return IsAvailable(testBlock);
+        }
+
         public void Reserve(int offset, int length)
         {
             if (length < 0)
@@ -125,14 +132,34 @@ namespace KustoPreForgeLib
         {
             lock (_lock)
             {
-                var source = new TaskCompletionSource();
+                if (IsAvailable(offset, length))
+                {
+                    return Task.CompletedTask;
+                }
+                else
+                {
+                    var source = new TaskCompletionSource();
 
-                _trackers.Add(new Tracker(
-                    new MemoryBlock(offset, length),
-                    source));
+                    _trackers.Add(new Tracker(
+                        new MemoryBlock(offset, length),
+                        source));
 
-                return source.Task;
+                    return source.Task;
+                }
             }
+        }
+
+        private bool IsAvailable(MemoryBlock testBlock)
+        {
+            foreach (var block in _reservedBlocks)
+            {
+                if (block.HasOverlap(testBlock))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void ValidateReservedBlocks()
@@ -171,23 +198,13 @@ namespace KustoPreForgeLib
                 _trackers.Clear();
                 foreach (var tracker in trackersCopy)
                 {
-                    var hasOverlap = false;
-
-                    foreach (var block in _reservedBlocks)
+                    if (IsAvailable(tracker.block))
                     {
-                        if (block.HasOverlap(tracker.block))
-                        {
-                            hasOverlap = true;
-                            break;
-                        }
-                    }
-                    if (hasOverlap)
-                    {
-                        _trackers.Add(tracker);
+                        tracker.source.SetResult();
                     }
                     else
                     {
-                        tracker.source.SetResult();
+                        _trackers.Add(tracker);
                     }
                 }
             }
