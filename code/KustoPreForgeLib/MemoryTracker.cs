@@ -80,7 +80,7 @@ namespace KustoPreForgeLib
                 }
                 else
                 {
-                    _reservedBlocks.Insert(index, newBlock);
+                    _reservedBlocks.Insert(~index, newBlock);
                     ValidateReservedBlocks();
                 }
             }
@@ -112,9 +112,10 @@ namespace KustoPreForgeLib
                     throw new InvalidDataException("No reserved block");
                 }
 
-                var existingBlock = _reservedBlocks[index < 0 ? ~index : index];
+                var nearestIndex = index < 0 ? ~index : index;
+                var existingBlock = _reservedBlocks[nearestIndex];
 
-                _reservedBlocks.RemoveAt(~index);
+                _reservedBlocks.RemoveAt(nearestIndex);
                 //  Bit before the release
                 Reserve(existingBlock.offset, Math.Max(0, offset - existingBlock.offset));
                 //  Bit after the release
