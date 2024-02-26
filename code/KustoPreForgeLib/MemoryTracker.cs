@@ -69,19 +69,26 @@ namespace KustoPreForgeLib
             {
                 return;
             }
+
             lock (_lock)
             {
                 var newBlock = new MemoryBlock(offset, length);
                 var index = _reservedBlocks.BinarySearch(newBlock, MemoryBlockComparer.Singleton);
 
-                if (index >= 0)
+                if (!IsAvailable(offset, length))
                 {
-                    throw new InvalidDataException("Existing block:  can't be reserved twice");
+                    throw new InvalidOperationException("Block isn't available to reserve");
+                }
+                if (index >= 0)
+                {   //  This should never be triggered
+                    throw new InvalidOperationException("Existing block:  can't be reserved twice");
                 }
                 else
                 {
-                    _reservedBlocks.Insert(~index, newBlock);
-                    ValidateReservedBlocks();
+                    var newIndex = ~index;
+
+                    _reservedBlocks.Insert(newIndex, newBlock);
+                    DoMerge(newIndex);
                 }
             }
         }
@@ -107,24 +114,52 @@ namespace KustoPreForgeLib
                     releaseBlock,
                     MemoryBlockComparer.Singleton);
 
-                if (~index == 0)
-                {
-                    throw new InvalidDataException("No reserved block");
+                if (index >= 0)
+                {   //  The offset match a block
+                    if (_reservedBlocks[index].length == length)
+                    {   //  Exact match
+                        _reservedBlocks.RemoveAt(index);
+                    }
+                    else if (_reservedBlocks[index].length > length)
+                    {   //  Existing block is bigger than release one
+                        _reservedBlocks[index] = new MemoryBlock(
+                            releaseBlock.End,
+                            _reservedBlocks[index].length - length);
+                    }
+                    else
+                    {   //  Existing block is smaller than release one:  doesn't work
+                        throw new InvalidDataException("Release more than existing block");
+                    }
                 }
+                else
+                {
+                    if (~index == 0)
+                    {
+                        throw new InvalidDataException("No reserved block");
+                    }
+                    else
+                    {
+                        if (_reservedBlocks[~index - 1].End > offset
+                            && _reservedBlocks[~index - 1].End >= releaseBlock.End)
+                        {
+                            var before = new MemoryBlock(
+                                _reservedBlocks[~index - 1].offset,
+                                offset - _reservedBlocks[~index - 1].offset);
+                            var after = new MemoryBlock(
+                                releaseBlock.End,
+                                _reservedBlocks[~index - 1].End - releaseBlock.End);
+                            var validBlocks = new[] { before, after }
+                            .Where(b => b.length > 0);
 
-                var nearestIndex = index < 0 ? ~index : index;
-                var existingBlock = _reservedBlocks[nearestIndex];
-
-                _reservedBlocks.RemoveAt(nearestIndex);
-                //  Bit before the release
-                Reserve(existingBlock.offset, Math.Max(0, offset - existingBlock.offset));
-                //  Bit after the release
-                Reserve(offset + length, Math.Max(0, existingBlock.offset + existingBlock.length - (offset + length)));
-                //  Bit after the existing block
-                Release(
-                    existingBlock.offset + existingBlock.length,
-                    Math.Max(0, length - existingBlock.length));
-                ValidateReservedBlocks();
+                            _reservedBlocks.RemoveAt(~index - 1);
+                            _reservedBlocks.InsertRange(~index - 1, validBlocks);
+                        }
+                        else
+                        {
+                            throw new InvalidDataException("Outside reserved blocks");
+                        }
+                    }
+                }
                 RaiseTracking();
             }
         }
@@ -163,33 +198,6 @@ namespace KustoPreForgeLib
             return true;
         }
 
-        private void ValidateReservedBlocks()
-        {
-            lock (_lock)
-            {
-                MemoryBlock? previousBlock = null;
-
-                foreach (var block in _reservedBlocks)
-                {
-                    if (previousBlock == null)
-                    {
-                        previousBlock = block;
-                    }
-                    else
-                    {
-                        if (block.offset <= previousBlock.offset)
-                        {
-                            throw new InvalidDataException("Two blocks in wrong order");
-                        }
-                        if (block.offset < previousBlock.End)
-                        {
-                            throw new InvalidDataException("Embedded blocks");
-                        }
-                    }
-                }
-            }
-        }
-
         private void RaiseTracking()
         {
             lock (_lock)
@@ -208,6 +216,30 @@ namespace KustoPreForgeLib
                         _trackers.Add(tracker);
                     }
                 }
+            }
+        }
+
+        private void DoMerge(int newIndex)
+        {
+            var newBlock = _reservedBlocks[newIndex];
+
+            if (_reservedBlocks.Count > newIndex + 1
+                && _reservedBlocks[newIndex + 1].offset == newBlock.End)
+            {   //  There is a block right after, let's merge
+                newBlock = new MemoryBlock(
+                    newBlock.offset,
+                    newBlock.length + _reservedBlocks[newIndex + 1].length);
+                _reservedBlocks.RemoveRange(newIndex, 2);
+                _reservedBlocks.Insert(newIndex, newBlock);
+            }
+            if (newIndex > 0
+                && _reservedBlocks[newIndex - 1].End == newBlock.offset)
+            {   //  There is a block right before, let's merge
+                newBlock = new MemoryBlock(
+                    _reservedBlocks[newIndex - 1].offset,
+                    newBlock.length + _reservedBlocks[newIndex - 1].length);
+                _reservedBlocks.RemoveRange(newIndex - 1, 2);
+                _reservedBlocks.Insert(newIndex - 1, newBlock);
             }
         }
     }

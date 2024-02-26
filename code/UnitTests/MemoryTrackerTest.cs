@@ -42,5 +42,23 @@ namespace UnitTests
             tracker.Release(5, 5);
             Assert.True(task.IsCompleted);
         }
+
+        [Fact]
+        public void ReserveThenReleaseIn3Parts()
+        {
+            var tracker = new MemoryTracker();
+
+            tracker.Reserve(0, 10);
+
+            var task = tracker.TrackAsync(0, 10);
+
+            Assert.False(task.IsCompleted);
+            tracker.Release(0, 3);
+            Assert.False(task.IsCompleted);
+            tracker.Release(7, 3);
+            Assert.False(task.IsCompleted);
+            tracker.Release(3, 4);
+            Assert.True(task.IsCompleted);
+        }
     }
 }
