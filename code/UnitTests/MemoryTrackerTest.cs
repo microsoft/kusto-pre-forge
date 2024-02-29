@@ -28,7 +28,7 @@ namespace UnitTests
         }
 
         [Fact]
-        public void ReserveThenReleaseInParts()
+        public void ReserveThenReleaseIn2Parts()
         {
             var tracker = new MemoryTracker();
 
