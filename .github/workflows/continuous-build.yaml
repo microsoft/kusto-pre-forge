@@ -36,6 +36,14 @@ jobs:
       run: |
         mkdir bin
         cp -r code/KustoPreForgeConsole/bin/Release/net*/* bin
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-build
+    - name: .NET Build Unit Tests
+      run: dotnet build code/UnitTests --configuration Release --no-restore
+    # See https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-test
+    - name: Unit Tests
+      run: |
+        dotnet test code/UnitTests --configuration Release \
+          --no-build --verbosity normal
 
     - name: Azure Login
       run: az login --service-principal -u ${{ secrets.DEPLOY_CLIENT_ID }} -p ${{ secrets.DEPLOY_SECRET }} --tenant ${{ secrets.TENANT_ID }}
