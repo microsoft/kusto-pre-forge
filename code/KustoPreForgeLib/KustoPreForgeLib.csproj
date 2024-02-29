@@ -14,9 +14,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.10.3" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.0" />
-    <PackageReference Include="Microsoft.Azure.Kusto.Ingest" Version="11.3.5" />
+    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+    <PackageReference Include="Microsoft.Azure.Kusto.Ingest" Version="12.1.0" />
   </ItemGroup>
 
 </Project>
