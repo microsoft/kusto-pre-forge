@@ -62,7 +62,7 @@ namespace KustoPreForgeLib.Text
 
                     if (size > 0)
                     {
-                        var croppedFragment = fragment.Splice(size).Right;
+                        var croppedFragment = fragment.Splice(size).Left;
 
                         croppedFragment.Reserve();
                         fragmentQueue.Enqueue(croppedFragment);
