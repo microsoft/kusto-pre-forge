@@ -18,11 +18,6 @@ namespace KustoPreForgeLib
             IBlobEnumerable blobEnumerable,
             RunningContext context)
         {
-            if (context.SourceBlobClient == null)
-            {
-                throw new ArgumentNullException(nameof(context.SourceBlobClient));
-            }
-
             var stopwatch = new Stopwatch();
 
             stopwatch.Start();
