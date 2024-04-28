@@ -32,7 +32,7 @@ namespace KustoPreForgeLib
         #region Constructors
         public static RunSettings FromEnvironmentVariables()
         {
-            var action = GetEnum<EtlAction>("Action", false);
+            var eltAction = GetEnum<EtlAction>("EtlAction", false);
             var authMode = GetEnum<AuthMode>("AuthMode", false);
             var managedIdentityResourceId = GetString("ManagedIdentityResourceId", false);
             var serviceBusQueueUrl = GetString("ServiceBusQueueUrl", false);
@@ -50,7 +50,7 @@ namespace KustoPreForgeLib
             var maxMbPerShard = GetInt("MaxMbPerShard", false);
 
             return new RunSettings(
-                action,
+                eltAction,
                 authMode,
                 managedIdentityResourceId,
                 new SourceSettings(
