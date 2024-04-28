@@ -184,7 +184,7 @@ namespace KustoPreForgeLib
 
             if (value != null)
             {
-                if (Enum.TryParse<T>(value, out var enumValue))
+                if (Enum.TryParse<T>(value, true, out var enumValue))
                 {
                     return enumValue;
                 }

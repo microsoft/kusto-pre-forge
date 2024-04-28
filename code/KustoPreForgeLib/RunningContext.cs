@@ -20,8 +20,8 @@ namespace KustoPreForgeLib
     public class RunningContext
     {
         private readonly Func<KustoQueuedIngestionProperties>? _ingestionPropertiesFactory;
-        private readonly IImmutableList<BlobContainerClient> _ingestionStagingContainers;
-        private volatile int _ingestionStagingContainerIndex = 0;
+        //private readonly IImmutableList<BlobContainerClient> _ingestionStagingContainers;
+        //private volatile int _ingestionStagingContainerIndex = 0;
 
         #region Constructors
         public static async Task<RunningContext> CreateAsync(RunSettings runSettings)
@@ -52,9 +52,11 @@ namespace KustoPreForgeLib
                         runSettings.KustoIngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
-            var ingestionStagingContainers = runSettings.KustoIngestUri != null
-                ? await GetIngestionStagingContainersAsync(kustoAdminClient!)
-                : ImmutableArray<BlobContainerClient>.Empty;
+            //var ingestionStagingContainers = runSettings.KustoIngestUri != null
+            //    ? await GetIngestionStagingContainersAsync(kustoAdminClient!)
+            //    : ImmutableArray<BlobContainerClient>.Empty;
+
+            await Task.CompletedTask;
 
             return new RunningContext(
                 blobSettings,
@@ -62,8 +64,9 @@ namespace KustoPreForgeLib
                 sourceBlobClient,
                 destinationBlobClient,
                 ingestClient,
-                ingestionPropertiesFactory,
-                ingestionStagingContainers);
+                ingestionPropertiesFactory);
+            //,
+            //    ingestionStagingContainers);
         }
 
         public RunningContext(
@@ -72,8 +75,9 @@ namespace KustoPreForgeLib
             BlockBlobClient? sourceBlobClient,
             BlockBlobClient? destinationBlobClient,
             IKustoQueuedIngestClient? ingestClient,
-            Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory,
-            IImmutableList<BlobContainerClient> ingestionStagingContainers)
+            Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory)
+            //,
+            //IImmutableList<BlobContainerClient> ingestionStagingContainers)
         {
             BlobSettings = blobSettings;
             Credentials = credentials;
@@ -81,7 +85,7 @@ namespace KustoPreForgeLib
             DestinationBlobClient = destinationBlobClient;
             IngestClient = ingestClient;
             _ingestionPropertiesFactory = ingestionPropertiesFactory;
-            _ingestionStagingContainers = ingestionStagingContainers;
+            //_ingestionStagingContainers = ingestionStagingContainers;
         }
 
         private static TokenCredential GetCredentials(RunSettings runSettings)
@@ -120,20 +124,20 @@ namespace KustoPreForgeLib
             return _ingestionPropertiesFactory();
         }
 
-        public BlobContainerClient RoundRobinIngestStagingContainer()
-        {
-            if (_ingestionStagingContainers.Count == 0)
-            {
-                throw new InvalidDataException("No ingestion staging containers are detected");
-            }
+        //public BlobContainerClient RoundRobinIngestStagingContainer()
+        //{
+        //    if (_ingestionStagingContainers.Count == 0)
+        //    {
+        //        throw new InvalidDataException("No ingestion staging containers are detected");
+        //    }
 
-            var client = _ingestionStagingContainers[
-                _ingestionStagingContainerIndex % _ingestionStagingContainers.Count];
+        //    var client = _ingestionStagingContainers[
+        //        _ingestionStagingContainerIndex % _ingestionStagingContainers.Count];
 
-            Interlocked.Increment(ref _ingestionStagingContainerIndex);
+        //    Interlocked.Increment(ref _ingestionStagingContainerIndex);
 
-            return client;
-        }
+        //    return client;
+        //}
 
         public RunningContext OverrideSourceBlob(Uri sourceUri)
         {
@@ -145,8 +149,9 @@ namespace KustoPreForgeLib
                 sourceBlobClient,
                 DestinationBlobClient,
                 IngestClient,
-                _ingestionPropertiesFactory,
-                _ingestionStagingContainers);
+                _ingestionPropertiesFactory);
+            //,
+            //    _ingestionStagingContainers
         }
 
         public static async Task<ImmutableArray<BlobContainerClient>> GetIngestionStagingContainersAsync(
