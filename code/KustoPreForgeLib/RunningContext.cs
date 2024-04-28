@@ -53,9 +53,7 @@ namespace KustoPreForgeLib
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
             var ingestionStagingContainers = runSettings.KustoIngestUri != null
-                ? await GetIngestionStagingContainersAsync(
-                    kustoAdminClient!,
-                    runSettings)
+                ? await GetIngestionStagingContainersAsync(kustoAdminClient!)
                 : ImmutableArray<BlobContainerClient>.Empty;
 
             return new RunningContext(
@@ -99,23 +97,6 @@ namespace KustoPreForgeLib
                 default:
                     throw new NotSupportedException($"Auth mode:  '{runSettings.AuthMode}'");
             }
-        }
-
-        private static async Task<ImmutableArray<BlobContainerClient>> GetIngestionStagingContainersAsync(
-            ICslAdminProvider kustoAdminClient,
-            RunSettings runSettings)
-        {
-            var dataReader = await kustoAdminClient.ExecuteControlCommandAsync(
-                string.Empty,
-                ".get ingestion resources");
-            var table = dataReader.ToDataSet().Tables[0];
-            var containers = table.Rows.Cast<DataRow>()
-                .Where(r => (string)r["ResourceTypeName"] == "TempStorage")
-                .Select(r => new Uri((string)r["StorageRoot"]))
-                .Select(uri => new BlobContainerClient(uri))
-                .ToImmutableArray();
-
-            return containers;
         }
         #endregion
 
@@ -166,6 +147,22 @@ namespace KustoPreForgeLib
                 IngestClient,
                 _ingestionPropertiesFactory,
                 _ingestionStagingContainers);
+        }
+
+        public static async Task<ImmutableArray<BlobContainerClient>> GetIngestionStagingContainersAsync(
+            ICslAdminProvider kustoAdminClient)
+        {
+            var dataReader = await kustoAdminClient.ExecuteControlCommandAsync(
+                string.Empty,
+                ".get ingestion resources");
+            var table = dataReader.ToDataSet().Tables[0];
+            var containers = table.Rows.Cast<DataRow>()
+                .Where(r => (string)r["ResourceTypeName"] == "TempStorage")
+                .Select(r => new Uri((string)r["StorageRoot"]))
+                .Select(uri => new BlobContainerClient(uri))
+                .ToImmutableArray();
+
+            return containers;
         }
     }
 }

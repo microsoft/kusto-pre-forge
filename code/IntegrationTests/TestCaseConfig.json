@@ -3,8 +3,8 @@
     "function": "GenerateLogData",
     "format": "txt",
     "inputCompression": "None",
+    "outputCompression": "None",
     "hasHeaders": false,
-    "isCompressed": false,
     "blobFolder": "Text/NoHeaderNoCompression",
     "table": "TextNoHeaderNoCompression"
   }

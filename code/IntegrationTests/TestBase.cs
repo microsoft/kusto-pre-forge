@@ -1,7 +1,5 @@
 ﻿using Azure.Core;
 using Azure.Identity;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Files.DataLake;
 using Azure.Storage.Files.DataLake.Specialized;
@@ -9,11 +7,11 @@ using Kusto.Cloud.Platform.Data;
 using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
+using Kusto.Ingest;
 using KustoPreForgeLib;
+using Microsoft.VisualStudio.TestPlatform.Common;
 using System.Collections.Immutable;
 using System.Data;
-using System.Reflection;
-using System.Reflection.PortableExecutable;
 using System.Text.Json;
 
 namespace IntegrationTests
@@ -57,17 +55,22 @@ namespace IntegrationTests
         private const string TEMPLATE_FOLDER = "template";
         private static readonly TimeSpan LOAD_TRACK_PERIOD = TimeSpan.FromSeconds(5);
 
-        private static readonly IImmutableDictionary<string, TestCaseConfiguration> _configuration =
+        private static readonly bool _isInProc;
+        private static readonly IImmutableDictionary<string, TestCaseConfiguration> _configurationMap =
             TestCaseConfiguration.LoadConfigurations();
         private static readonly string _testId = Guid.NewGuid().ToString();
         private static readonly TokenCredential _credentials;
         private static readonly DataLakeDirectoryClient _templateRoot;
         private static readonly DataLakeDirectoryClient _testsRoot;
+        private static readonly string _database;
         private static readonly ICslAdminProvider _kustoCommandProvider;
         private static readonly ICslQueryProvider _kustoQueryProvider;
+        private static readonly IKustoQueuedIngestClient _kustoIngestProvider;
+        private static readonly ICslAdminProvider _kustoIngestCommandProvider;
         private static readonly ExportManager _exportManager;
         private static readonly Task _setupTask;
 
+        private readonly TestCaseConfiguration _configuration;
         private readonly DataLakeDirectoryClient _testTemplate;
 
         protected string TableName { get; }
@@ -79,6 +82,7 @@ namespace IntegrationTests
 
             _credentials = GetCredentials();
 
+            _isInProc = GetBooleanVariable("IsInProc");
             var blobLandingFolder = GetEnvironmentVariable("BlobLandingFolder");
 
             var landingTest = new DataLakeDirectoryClient(
@@ -92,10 +96,10 @@ namespace IntegrationTests
                 .GetSubDirectoryClient("tests");
 
             var kustoIngestUri = GetEnvironmentVariable("KustoIngestUri");
-            var kustoDb = GetEnvironmentVariable("KustoDb");
 
-            (_kustoCommandProvider, _kustoQueryProvider) =
-                CreateKustoProviders(kustoIngestUri, kustoDb, _credentials);
+            _database = GetEnvironmentVariable("KustoDb");
+            (_kustoCommandProvider, _kustoQueryProvider, _kustoIngestProvider, _kustoIngestCommandProvider) =
+                CreateKustoProviders(kustoIngestUri, _database, _credentials);
             _exportManager = new ExportManager(
                 new OperationManager(_kustoCommandProvider),
                 _kustoCommandProvider);
@@ -106,10 +110,13 @@ namespace IntegrationTests
         {
             await EnsureTemplatesAsync();
             await CleanTablesAsync();
-            await CopyTemplatesAsync();
+            if (!_isInProc)
+            {
+                await CopyTemplatesAsync();
+            }
         }
 
-        private static (ICslAdminProvider, ICslQueryProvider) CreateKustoProviders(
+        private static (ICslAdminProvider, ICslQueryProvider, IKustoQueuedIngestClient, ICslAdminProvider) CreateKustoProviders(
             string kustoIngestUri,
             string kustoDb,
             TokenCredential credentials)
@@ -119,24 +126,46 @@ namespace IntegrationTests
             uriBuilder.Host = uriBuilder.Host.Replace("ingest-", string.Empty);
             uriBuilder.Path = kustoDb;
 
-            var kustoBuilder = new KustoConnectionStringBuilder(uriBuilder.ToString())
+            var kustoIngestBuilder = new KustoConnectionStringBuilder(kustoIngestUri)
                 .WithAadAzureTokenCredentialsAuthentication(credentials);
-            var kustoCommandProvider = KustoClientFactory.CreateCslAdminProvider(kustoBuilder);
-            var kustoQueryProvider = KustoClientFactory.CreateCslQueryProvider(kustoBuilder);
+            var kustoEngineBuilder = new KustoConnectionStringBuilder(uriBuilder.ToString())
+                .WithAadAzureTokenCredentialsAuthentication(credentials);
+            var kustoCommandProvider =
+                KustoClientFactory.CreateCslAdminProvider(kustoEngineBuilder);
+            var kustoQueryProvider =
+                KustoClientFactory.CreateCslQueryProvider(kustoEngineBuilder);
+            var kustoIngestProvider =
+                KustoIngestFactory.CreateQueuedIngestClient(kustoIngestBuilder);
+            var kustoIngestCommandProvider =
+                KustoClientFactory.CreateCslAdminProvider(kustoIngestBuilder);
 
-            return (kustoCommandProvider, kustoQueryProvider);
+            return (kustoCommandProvider, kustoQueryProvider, kustoIngestProvider, kustoIngestCommandProvider);
         }
 
         private static string GetEnvironmentVariable(string name)
         {
-            var blobLandingFolder = Environment.GetEnvironmentVariable(name);
+            var variable = Environment.GetEnvironmentVariable(name);
 
-            if (string.IsNullOrWhiteSpace(blobLandingFolder))
+            if (string.IsNullOrWhiteSpace(variable))
             {
                 throw new ArgumentNullException(name);
             }
 
-            return blobLandingFolder;
+            return variable;
+        }
+
+        private static bool GetBooleanVariable(string name, bool defaultValue = false)
+        {
+            var variable = Environment.GetEnvironmentVariable(name);
+
+            if (string.IsNullOrWhiteSpace(variable))
+            {
+                return defaultValue;
+            }
+            else
+            {
+                return bool.Parse(variable);
+            }
         }
 
         private static TokenCredential GetCredentials()
@@ -178,6 +207,7 @@ namespace IntegrationTests
         protected TestBase(string tableName)
         {
             TableName = tableName;
+            _configuration = _configurationMap[tableName];
             _testTemplate = _templateRoot.GetSubDirectoryClient(TableName);
         }
 
@@ -212,6 +242,55 @@ namespace IntegrationTests
 
         #region Table Load
         protected async Task EnsureTableLoadAsync()
+        {
+            if (_isInProc)
+            {
+                await LoadTableInProcAsync();
+            }
+            else
+            {
+                await EnsureTableLoadedOutOfProcAsync();
+            }
+        }
+
+        private async Task LoadTableInProcAsync()
+        {
+            async Task<BlockBlobClient> GetTemplateBlobAsync()
+            {
+                await foreach (var item in _testTemplate.GetPathsAsync())
+                {
+                    //_testTemplate.Uri
+                    //item.Name;
+                    throw new NotImplementedException();
+                }
+
+                throw new InvalidDataException("No blob found");
+            }
+
+            var sourceBlob = await GetTemplateBlobAsync();
+            var ingestionStagingContainers =
+                await RunningContext.GetIngestionStagingContainersAsync(_kustoIngestCommandProvider);
+            var context = new RunningContext(
+                new BlobSettings(
+                    _configuration.Format,
+                    _configuration.InputCompression,
+                    _configuration.OutputCompression,
+                    _configuration.HasHeaders,
+                    null),
+                _credentials,
+                sourceBlob,
+                null,
+                _kustoIngestProvider,
+                () => new KustoQueuedIngestionProperties(_database, TableName)
+                {
+                    Format = _configuration.Format
+                },
+                ingestionStagingContainers);
+
+            await EtlRun.RunEtlAsync(context);
+        }
+
+        private async Task EnsureTableLoadedOutOfProcAsync()
         {
             int? totalShardCount = null;
 
@@ -282,11 +361,11 @@ namespace IntegrationTests
                     .Where(i => i.IsDirectory != true)
                     .Select(i => i.Name)
                     .Select(n => n.Substring(_templateRoot.Path.Length));
-                var remainingConfig = _configuration;
+                var remainingConfig = _configurationMap;
 
                 foreach (var subPath in subPaths)
                 {
-                    foreach (var config in _configuration.Values)
+                    foreach (var config in _configurationMap.Values)
                     {
                         if (subPath.TrimStart('/').StartsWith(config.BlobFolder))
                         {
@@ -299,7 +378,7 @@ namespace IntegrationTests
             }
             else
             {
-                return _configuration.Values.ToImmutableArray();
+                return _configurationMap.Values.ToImmutableArray();
             }
         }
 
@@ -307,11 +386,13 @@ namespace IntegrationTests
             string connectionString,
             TestCaseConfiguration config)
         {
-            var exportFormat = config.Format == "txt"
-                ? "csv"
+            var exportFormat = config.Format == DataSourceFormat.txt
+                ? DataSourceFormat.csv
                 : config.Format;
             var prefix = $"{_templateRoot.Path}/{config.BlobFolder}/";
-            var compressed = config.IsCompressed ? "compressed" : string.Empty;
+            var compressed = config.InputCompression != DataSourceCompressionType.None
+                ? "compressed"
+                : string.Empty;
             var headers = config.HasHeaders ? "all" : "none";
             var script = $@"
 .export async {compressed} to {exportFormat} (
@@ -335,11 +416,11 @@ namespace IntegrationTests
         {
             var tableTextList = string.Join(
                 ", ",
-                _configuration.Values
+                _configurationMap.Values
                 .Select(c => c.Table));
             var setTables = string.Join(
                 Environment.NewLine + Environment.NewLine,
-                _configuration.Values
+                _configurationMap.Values
                 .Select(c => c.GetCreateTableScript()));
             var script = @$"
 .execute database script with (ThrowOnErrors=true) <|
@@ -357,7 +438,7 @@ namespace IntegrationTests
         #region Template Copy
         private static async Task CopyTemplatesAsync()
         {
-            var copyTasks = new List<Task>(_configuration.Count);
+            var copyTasks = new List<Task>(_configurationMap.Count);
 
             await foreach (var sourceItem in _templateRoot.GetPathsAsync(true))
             {
