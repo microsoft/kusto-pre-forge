@@ -1,6 +1,5 @@
 ﻿using Kusto.Data.Common;
 using KustoPreForgeLib.LineBased;
-using KustoPreForgeLib.Text;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,7 +11,7 @@ namespace KustoPreForgeLib
 {
     public static class EtlRun
     {
-        public static async Task RunEtlAsync(RunningContext context)
+        public static async Task RunEtlAsync(EtlAction action, RunningContext context)
         {
             if (context.SourceBlobClient == null)
             {
@@ -23,48 +22,67 @@ namespace KustoPreForgeLib
 
             stopwatch.Start();
 
-            var etl = CreateEtl(context);
+            var etl = CreateEtl(action, context);
 
             await etl.ProcessAsync();
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
         }
 
-        private static IEtl CreateEtl(RunningContext context)
+        private static IEtl CreateEtl(EtlAction action, RunningContext context)
+        {
+            switch(action)
+            {
+                case EtlAction.Split:
+                    return CreateSplitEtl(context);
+                case EtlAction.PrePartition:
+                    return CreatePrePartitionEtl(context);
+
+                default:
+                    throw new NotSupportedException(action.ToString());
+            }
+        }
+
+        private static IEtl CreateSplitEtl(RunningContext context)
         {
             switch (context.BlobSettings.Format)
             {
-                case DataSourceFormat.txt:
-                    {
-                        var streamSinkFactory = GetStreamSinkFactory(context);
-                        var lineParsingSink = new TextLineParsingSink(
-                            (header) => new TextPartitionSink(header, streamSinkFactory),
-                            context.BlobSettings.HasHeaders);
-                        var source = new TextSource(
-                            context.SourceBlobClient!,
-                            context.BlobSettings.InputCompression,
-                            lineParsingSink);
+                //case DataSourceFormat.txt:
+                //    {
+                //        var streamSinkFactory = GetStreamSinkFactory(context);
+                //        var lineParsingSink = new TextLineParsingSink(
+                //            (header) => new TextPartitionSink(header, streamSinkFactory),
+                //            context.BlobSettings.HasHeaders);
+                //        var source = new TextSource(
+                //            context.SourceBlobClient!,
+                //            context.BlobSettings.InputCompression,
+                //            lineParsingSink);
 
-                        return new SingleSourceEtl(source);
-                    }
+                //        return new SingleSourceEtl(source);
+                //    }
 
                 default:
                     throw new NotSupportedException($"Format '{context.BlobSettings.Format}'");
             }
         }
 
-        private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
-            RunningContext context)
+        private static IEtl CreatePrePartitionEtl(RunningContext context)
         {
-            if (context.IngestClient == null)
-            {
-                return (header, shardIndex) => new TextBlobSink(header, context, shardIndex);
-            }
-            else
-            {
-                var blobNamePrefix = Guid.NewGuid().ToString();
-
-                return (header, shardIndex) => new TextKustoSink(header, context, shardIndex, blobNamePrefix);
-            }
+            throw new NotImplementedException();
         }
+
+        //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
+        //    RunningContext context)
+        //{
+        //    if (context.IngestClient == null)
+        //    {
+        //        return (header, shardIndex) => new TextBlobSink(header, context, shardIndex);
+        //    }
+        //    else
+        //    {
+        //        var blobNamePrefix = Guid.NewGuid().ToString();
+
+        //        return (header, shardIndex) => new TextKustoSink(header, context, shardIndex, blobNamePrefix);
+        //    }
+        //}
     }
 }

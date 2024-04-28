@@ -69,7 +69,7 @@ namespace KustoPreForgeServiceBus
 
             var subSettings = context.OverrideSourceBlob(payload.Data?.BlobUrl!);
 
-            await EtlRun.RunEtlAsync(subSettings);
+            await EtlRun.RunEtlAsync(EtlAction.Split, subSettings);
             ctSource.Cancel();
             await renewTask;
             await receiver.CompleteMessageAsync(message);

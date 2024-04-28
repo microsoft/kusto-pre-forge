@@ -10,7 +10,7 @@ namespace KustoPreForgeLib
     public class RunSettings
     {
         #region Properties
-        public Action Action { get; }
+        public EtlAction Action { get; }
 
         public AuthMode AuthMode { get; }
 
@@ -32,7 +32,7 @@ namespace KustoPreForgeLib
         #region Constructors
         public static RunSettings FromEnvironmentVariables()
         {
-            var action = GetEnum<Action>("Action", false);
+            var action = GetEnum<EtlAction>("Action", false);
             var authMode = GetEnum<AuthMode>("AuthMode", false);
             var managedIdentityResourceId = GetString("ManagedIdentityResourceId", false);
             var serviceBusQueueUrl = GetString("ServiceBusQueueUrl", false);
@@ -71,7 +71,7 @@ namespace KustoPreForgeLib
         }
 
         public RunSettings(
-            Action? action,
+            EtlAction? action,
             AuthMode? authMode,
             string? managedIdentityResourceId,
             SourceSettings sourceSettings,
@@ -100,7 +100,7 @@ namespace KustoPreForgeLib
                 throw new ArgumentNullException(nameof(managedIdentityResourceId));
             }
 
-            Action = action ?? Action.Split;
+            Action = action ?? EtlAction.Split;
             AuthMode = authMode ?? AuthMode.Default;
             ManagedIdentityResourceId = managedIdentityResourceId;
             SourceSettings = sourceSettings;

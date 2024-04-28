@@ -1,6 +1,6 @@
 ﻿namespace KustoPreForgeLib
 {
-    public enum Action
+    public enum EtlAction
     {
         Split,
         PrePartition
