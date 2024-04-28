@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using KustoPreForgeLib;
-using KustoPreForgeServiceBus;
+using KustoPreForgeLib.BlobEnumerables;
 
 namespace KustoPreForgeConsole
 {
@@ -30,17 +30,20 @@ namespace KustoPreForgeConsole
 
                 var runSettings = RunSettings.FromEnvironmentVariables();
                 var context = await RunningContext.CreateAsync(runSettings);
+                var blobEnumerables =
+                    BlobEnumerableFactory.Create(context, runSettings.SourceSettings);
 
                 runSettings.WriteOutSettings();
                 if (string.IsNullOrWhiteSpace(runSettings.SourceSettings.ServiceBusQueueUrl))
                 {   //  Run one ETL
-                    await EtlRun.RunEtlAsync(runSettings.Action, context);
+                    await EtlRun.RunEtlAsync(runSettings.Action, blobEnumerables, context);
                 }
                 else
                 {   //  Run Service Bus server picking up tasks
-                    await ServiceBusServer.RunServerAsync(
-                        runSettings.SourceSettings.ServiceBusQueueUrl,
-                        context);
+                    //await ServiceBusServer.RunServerAsync(
+                    //    runSettings.SourceSettings.ServiceBusQueueUrl,
+                    //    context);
+                    throw new NotSupportedException();
                 }
             }
             catch (Exception ex)

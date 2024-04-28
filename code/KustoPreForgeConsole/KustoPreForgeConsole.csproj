@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\KustoPreForgeLib\KustoPreForgeLib.csproj" />
-    <ProjectReference Include="..\KustoPreForgeServiceBus\KustoPreForgeServiceBus.csproj" />
   </ItemGroup>
 
 </Project>

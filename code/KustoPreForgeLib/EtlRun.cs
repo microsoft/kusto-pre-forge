@@ -1,4 +1,6 @@
 ﻿using Kusto.Data.Common;
+using KustoPreForgeLib.BinarySinks;
+using KustoPreForgeLib.BlobEnumerables;
 using KustoPreForgeLib.LineBased;
 using System;
 using System.Collections.Generic;
@@ -11,7 +13,10 @@ namespace KustoPreForgeLib
 {
     public static class EtlRun
     {
-        public static async Task RunEtlAsync(EtlAction action, RunningContext context)
+        public static async Task RunEtlAsync(
+            EtlAction action,
+            IBlobEnumerable blobEnumerable,
+            RunningContext context)
         {
             if (context.SourceBlobClient == null)
             {
@@ -22,20 +27,23 @@ namespace KustoPreForgeLib
 
             stopwatch.Start();
 
-            var etl = CreateEtl(action, context);
+            var etl = CreateEtl(action, blobEnumerable, context);
 
             await etl.ProcessAsync();
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
         }
 
-        private static IEtl CreateEtl(EtlAction action, RunningContext context)
+        private static IEtl CreateEtl(
+            EtlAction action,
+            IBlobEnumerable blobEnumerable,
+            RunningContext context)
         {
-            switch(action)
+            switch (action)
             {
                 case EtlAction.Split:
                     return CreateSplitEtl(context);
                 case EtlAction.PrePartition:
-                    return CreatePrePartitionEtl(context);
+                    return CreatePrePartitionEtl(blobEnumerable, context);
 
                 default:
                     throw new NotSupportedException(action.ToString());
@@ -65,9 +73,11 @@ namespace KustoPreForgeLib
             }
         }
 
-        private static IEtl CreatePrePartitionEtl(RunningContext context)
+        private static IEtl CreatePrePartitionEtl(
+            IBlobEnumerable blobEnumerable,
+            RunningContext context)
         {
-            throw new NotImplementedException();
+            return new SingleSourceEtl(new BlobSource(blobEnumerable));
         }
 
         //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(

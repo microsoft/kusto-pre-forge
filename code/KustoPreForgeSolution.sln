@@ -5,8 +5,6 @@ VisualStudioVersion = 17.6.33815.320
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeLib", "KustoPreForgeLib\KustoPreForgeLib.csproj", "{B8CD0FA5-1636-46C9-810A-68B888FA3370}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeServiceBus", "KustoPreForgeServiceBus\KustoPreForgeServiceBus.csproj", "{F42F7610-9744-4905-A01C-C0E6130A1C32}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KustoPreForgeConsole", "KustoPreForgeConsole\KustoPreForgeConsole.csproj", "{74617627-873B-4B2C-BC4B-D95B9BF421F9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "UnitTests\UnitTests.csproj", "{FACB1F31-CC29-4E1C-840E-3126A8878857}"
@@ -21,10 +19,6 @@ Global
 		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8CD0FA5-1636-46C9-810A-68B888FA3370}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F42F7610-9744-4905-A01C-C0E6130A1C32}.Release|Any CPU.Build.0 = Release|Any CPU
 		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{74617627-873B-4B2C-BC4B-D95B9BF421F9}.Release|Any CPU.ActiveCfg = Release|Any CPU

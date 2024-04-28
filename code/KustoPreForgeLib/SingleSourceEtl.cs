@@ -10,6 +10,7 @@ namespace KustoPreForgeLib.LineBased
     {
         private readonly ISource _source;
 
+
         public SingleSourceEtl(ISource source)
         {
             _source = source;
