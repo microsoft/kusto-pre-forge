@@ -14,15 +14,13 @@ namespace KustoPreForgeLib
 
         public string? ManagedIdentityResourceId { get; }
 
-        public string? ServiceBusQueueUrl { get; }
+        public SourceSettings SourceSettings { get; }
 
         public Uri? KustoIngestUri { get; }
 
         public string? KustoDb { get; }
 
         public string? KustoTable { get; }
-
-        public Uri? SourceBlob { get; }
 
         public Uri? DestinationBlobPrefix { get; }
 
@@ -36,6 +34,8 @@ namespace KustoPreForgeLib
             var managedIdentityResourceId = GetString("ManagedIdentityResourceId", false);
             var serviceBusQueueUrl = GetString("ServiceBusQueueUrl", false);
             var sourceBlob = GetUri("SourceBlob", false);
+            var sourceBlobsPrefix = GetUri("SourceBlobsPrefix", false);
+            var sourceBlobsSuffix = GetString("SourceBlobsSuffix", false);
             var destinationBlobPrefix = GetUri("DestinationBlobPrefix", false);
             var kustoIngestUri = GetUri("KustoIngestUri", false);
             var kustoDb = GetString("KustoDb", false);
@@ -49,11 +49,14 @@ namespace KustoPreForgeLib
             return new RunSettings(
                 authMode,
                 managedIdentityResourceId,
-                serviceBusQueueUrl,
+                new SourceSettings(
+                    serviceBusQueueUrl,
+                    sourceBlob,
+                    sourceBlobsPrefix,
+                    sourceBlobsSuffix),
                 kustoIngestUri,
                 kustoDb,
                 kustoTable,
-                sourceBlob,
                 destinationBlobPrefix,
                 new BlobSettings(
                     format,
@@ -66,19 +69,13 @@ namespace KustoPreForgeLib
         public RunSettings(
             AuthMode? authMode,
             string? managedIdentityResourceId,
-            string? serviceBusQueueUrl,
+            SourceSettings sourceSettings,
             Uri? kustoIngestUri,
             string? kustoDb,
             string? kustoTable,
-            Uri? sourceBlob,
             Uri? destinationBlobPrefix,
             BlobSettings blobSettings)
         {
-            if (serviceBusQueueUrl == null && sourceBlob == null)
-            {
-                throw new ArgumentNullException(
-                    $"Either {serviceBusQueueUrl} or {sourceBlob} must be specified");
-            }
             if (kustoIngestUri != null)
             {
                 if (kustoDb == null || kustoTable == null)
@@ -100,11 +97,10 @@ namespace KustoPreForgeLib
 
             AuthMode = authMode ?? AuthMode.Default;
             ManagedIdentityResourceId = managedIdentityResourceId;
-            ServiceBusQueueUrl = serviceBusQueueUrl;
+            SourceSettings = sourceSettings;
             KustoIngestUri = kustoIngestUri;
             KustoDb = kustoDb;
             KustoTable = kustoTable;
-            SourceBlob = sourceBlob;
             DestinationBlobPrefix = destinationBlobPrefix;
             BlobSettings = blobSettings;
         }
@@ -260,8 +256,7 @@ namespace KustoPreForgeLib
             Console.WriteLine();
             Console.WriteLine($"AuthMode:  {AuthMode}");
             Console.WriteLine($"ManagedIdentityResourceId:  {ManagedIdentityResourceId}");
-            Console.WriteLine($"ServiceBusQueueUrl:  {ServiceBusQueueUrl}");
-            Console.WriteLine($"SourceBlob:  {SourceBlob}");
+            SourceSettings.WriteOutSettings();
             Console.WriteLine($"DestinationBlobPrefix:  {DestinationBlobPrefix}");
             Console.WriteLine($"KustoIngestUri:  {KustoIngestUri}");
             Console.WriteLine($"KustoDb:  {KustoDb}");

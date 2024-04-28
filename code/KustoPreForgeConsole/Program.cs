@@ -32,14 +32,14 @@ namespace KustoPreForgeConsole
                 var context = await RunningContext.CreateAsync(runSettings);
 
                 runSettings.WriteOutSettings();
-                if (string.IsNullOrWhiteSpace(runSettings.ServiceBusQueueUrl))
+                if (string.IsNullOrWhiteSpace(runSettings.SourceSettings.ServiceBusQueueUrl))
                 {   //  Run one ETL
                     await EtlRun.RunEtlAsync(context);
                 }
                 else
                 {   //  Run Service Bus server picking up tasks
                     await ServiceBusServer.RunServerAsync(
-                        runSettings.ServiceBusQueueUrl,
+                        runSettings.SourceSettings.ServiceBusQueueUrl,
                         context);
                 }
             }

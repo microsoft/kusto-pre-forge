@@ -28,8 +28,8 @@ namespace KustoPreForgeLib
         {
             var blobSettings = runSettings.BlobSettings;
             var credentials = GetCredentials(runSettings);
-            var sourceBlobClient = runSettings.SourceBlob != null
-                ? new BlockBlobClient(runSettings.SourceBlob, credentials)
+            var sourceBlobClient = runSettings.SourceSettings.SourceBlob != null
+                ? new BlockBlobClient(runSettings.SourceSettings.SourceBlob, credentials)
                 : null;
             var destinationBlobClient = runSettings.DestinationBlobPrefix != null
                 ? new BlockBlobClient(runSettings.DestinationBlobPrefix, credentials)
