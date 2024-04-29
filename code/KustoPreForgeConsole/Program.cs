@@ -2,6 +2,7 @@
 using System.Reflection;
 using KustoPreForgeLib;
 using KustoPreForgeLib.BlobSources;
+using KustoPreForgeLib.Settings;
 
 namespace KustoPreForgeConsole
 {
