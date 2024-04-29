@@ -3,6 +3,7 @@
     public enum AuthMode
     {
         Default,
-        ManagedIdentity
+        ManagedIdentity,
+        Secret
     }
 }

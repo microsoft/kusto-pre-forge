@@ -21,14 +21,12 @@ namespace KustoPreForgeLib
     public class RunningContext
     {
         private readonly Func<KustoQueuedIngestionProperties>? _ingestionPropertiesFactory;
-        //private readonly IImmutableList<BlobContainerClient> _ingestionStagingContainers;
-        //private volatile int _ingestionStagingContainerIndex = 0;
 
         #region Constructors
         public static async Task<RunningContext> CreateAsync(RunSettings runSettings)
         {
             var blobSettings = runSettings.BlobSettings;
-            var credentials = GetCredentials(runSettings);
+            var credentials = runSettings.AuthSettings.GetCredentials();
             var sourceBlobClient = runSettings.SourceSettings.SourceBlob != null
                 ? new BlockBlobClient(runSettings.SourceSettings.SourceBlob, credentials)
                 : null;
@@ -79,23 +77,6 @@ namespace KustoPreForgeLib
             DestinationBlobClient = destinationBlobClient;
             IngestClient = ingestClient;
             _ingestionPropertiesFactory = ingestionPropertiesFactory;
-        }
-
-        private static TokenCredential GetCredentials(RunSettings runSettings)
-        {
-            switch (runSettings.AuthSettings.AuthMode)
-            {
-                case AuthMode.Default:
-                    return new DefaultAzureCredential();
-                case AuthMode.ManagedIdentity:
-                    return new ManagedIdentityCredential(
-                        new ResourceIdentifier(
-                            runSettings.AuthSettings.ManagedIdentityResourceId!));
-
-                default:
-                    throw new NotSupportedException(
-                        $"Auth mode:  '{runSettings.AuthSettings.AuthMode}'");
-            }
         }
         #endregion
 

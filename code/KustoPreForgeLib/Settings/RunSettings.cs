@@ -33,6 +33,9 @@ namespace KustoPreForgeLib.Settings
             var eltAction = GetEnum<EtlAction>("EtlAction", false);
             var authMode = GetEnum<AuthMode>("AuthMode", false);
             var managedIdentityResourceId = GetString("ManagedIdentityResourceId", false);
+            var tenantId = GetString("TenantId", false);
+            var applicationId = GetString("ApplicationId", false);
+            var secret = GetString("Secret", false);
             var serviceBusQueueUrl = GetString("ServiceBusQueueUrl", false);
             var sourceBlob = GetUri("SourceBlob", false);
             var sourceBlobsPrefix = GetUri("SourceBlobsPrefix", false);
@@ -49,7 +52,12 @@ namespace KustoPreForgeLib.Settings
 
             return new RunSettings(
                 eltAction,
-                new AuthSettings(authMode, managedIdentityResourceId),
+                new AuthSettings(
+                    authMode,
+                    managedIdentityResourceId,
+                    tenantId,
+                    applicationId,
+                    secret),
                 new SourceSettings(
                     serviceBusQueueUrl,
                     sourceBlob,
