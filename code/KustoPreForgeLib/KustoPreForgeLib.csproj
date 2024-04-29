@@ -27,4 +27,8 @@
     <PackageReference Include="Microsoft.Azure.Kusto.Ingest" Version="12.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Transforms\" />
+  </ItemGroup>
+
 </Project>
