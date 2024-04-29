@@ -20,30 +20,35 @@ namespace KustoPreForgeLib
 
             stopwatch.Start();
 
-            var etl = CreateEtl(action, blobSource, context);
+            var journal = new PerfCounterJournal();
+            var etl = CreateEtl(action, blobSource, context, journal);
 
+            journal.StartReporting();
             await etl.ProcessAsync();
+            await journal.StopReportingAsync();
+
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
         }
 
         private static IEtl CreateEtl(
             EtlAction action,
             IDataSource<BlobData> blobSource,
-            RunningContext context)
+            RunningContext context,
+            PerfCounterJournal journal)
         {
             switch (action)
             {
                 case EtlAction.Split:
-                    return CreateSplitEtl(context);
+                    return CreateSplitEtl(context, journal);
                 case EtlAction.PrePartition:
-                    return CreatePrePartitionEtl(blobSource, context);
+                    return CreatePrePartitionEtl(blobSource, context, journal);
 
                 default:
                     throw new NotSupportedException(action.ToString());
             }
         }
 
-        private static IEtl CreateSplitEtl(RunningContext context)
+        private static IEtl CreateSplitEtl(RunningContext context, PerfCounterJournal journal)
         {
             switch (context.BlobSettings.Format)
             {
@@ -68,9 +73,10 @@ namespace KustoPreForgeLib
 
         private static IEtl CreatePrePartitionEtl(
             IDataSource<BlobData> blobSource,
-            RunningContext context)
+            RunningContext context,
+            PerfCounterJournal journal)
         {
-            return new SingleSourceEtl(UniversalSink.Create(blobSource));
+            return new SingleSourceEtl(UniversalSink.Create(blobSource, journal));
         }
 
         //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(

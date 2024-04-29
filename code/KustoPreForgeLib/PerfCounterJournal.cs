@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
-    internal class PerfCounterJournal
+    public class PerfCounterJournal
     {
         #region Inner Types
         private record Reading(string perfCounterName, long value);
@@ -47,23 +47,25 @@ namespace KustoPreForgeLib
 
         private void ReportCounters()
         {
-            var counterMap = new Dictionary<string, long>();
+            var counterlist = new List<Reading>();
 
             while (_readingsQueue.TryDequeue(out var item))
             {
-                if (counterMap.TryGetValue(item.perfCounterName, out var currentValue))
-                {
-                    counterMap[item.perfCounterName] = currentValue + item.value;
-                }
-                else
-                {
-                    counterMap[item.perfCounterName] = item.value;
-                }
+                counterlist.Add(item);
             }
 
-            foreach (var perfCounter in counterMap.OrderBy(p => p.Key))
+            var counters = counterlist
+                .GroupBy(i => i.perfCounterName)
+                .Select(g => new
+                {
+                    Name = g.Key,
+                    SumValue = g.Sum(i => i.value)
+                })
+                .OrderBy(i => i.Name);
+
+            foreach (var perfCounter in counters)
             {
-                Console.WriteLine($"{perfCounter.Key}:  {perfCounter.Value}");
+                Console.WriteLine($"{perfCounter.Name}:  {perfCounter.SumValue}");
             }
             Console.WriteLine();
         }
