@@ -50,11 +50,6 @@ jobs:
     - name: Azure Subscription Set
       run: az account set --name ${{ secrets.SUBSCRIPTION }}
 
-    - name: Retrieve docker registry
-      run: |
-        registry=$(az acr list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].name" -o tsv)
-        echo "Registry:  $registry"
-        echo "registry=$registry" >> $GITHUB_ENV
     - name: Retrieve container app
       run: |
         containerApp=$(az containerapp list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].name" -o tsv)
@@ -66,7 +61,7 @@ jobs:
     - name:  Docker Build / Push container
       run:  |
         az acr build --image "kusto-pre-forge/dev:${{ steps.patch-version.outputs.full-version }}" \
-          --registry $registry \
+          --registry ${{ secrets.REGISTRY_NAME }} \
           --file deployment/docker/Dockerfile bin
     - name:  Docker tag latest
       run:  |
@@ -77,4 +72,4 @@ jobs:
     - name:  Update revision in Container App
       run:  |
         az containerapp revision copy -g ${{ secrets.RESOURCE_GROUP }} -n $containerApp \
-          --image "kusto-pre-forge/dev:${{ steps.patch-version.outputs.full-version }}"
+          --image "${{ secrets.REGISTRY_NAME }}.azurecr.io/kusto-pre-forge/dev:${{ steps.patch-version.outputs.full-version }}"
