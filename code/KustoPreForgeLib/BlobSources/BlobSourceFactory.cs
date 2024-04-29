@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.BlobEnumerables
+namespace KustoPreForgeLib.BlobSources
 {
-    public class BlobEnumerableFactory
+    public class BlobSourceFactory
     {
-        public static IBlobEnumerable Create(
+        public static IDataSource<BlobData> Create(
             RunningContext runningContext,
             SourceSettings sourceSettings)
         {
@@ -22,7 +22,7 @@ namespace KustoPreForgeLib.BlobEnumerables
             }
             else if (sourceSettings.SourceBlobsPrefix != null)
             {
-                return new ListBlobEnumerable(
+                return new ListBlobSource(
                     sourceSettings.SourceBlobsPrefix,
                     sourceSettings.SourceBlobsSuffix,
                     runningContext.Credentials);

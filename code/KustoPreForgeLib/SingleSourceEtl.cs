@@ -4,14 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.LineBased
+namespace KustoPreForgeLib
 {
     internal class SingleSourceEtl : IEtl
     {
-        private readonly ISource _source;
+        private readonly ISink _source;
 
 
-        public SingleSourceEtl(ISource source)
+        public SingleSourceEtl(ISink source)
         {
             _source = source;
         }

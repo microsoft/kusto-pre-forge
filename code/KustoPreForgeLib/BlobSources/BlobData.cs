@@ -5,10 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib.BlobEnumerables
+namespace KustoPreForgeLib.BlobSources
 {
-    public interface IBlobEnumerable
-    {
-        IAsyncEnumerable<BlobClient> EnumerateBlobs();
-    }
+    public record BlobData(BlobClient BlobClient, long BlobSize);
 }

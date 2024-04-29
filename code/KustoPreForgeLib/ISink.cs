@@ -1,6 +1,6 @@
 ﻿namespace KustoPreForgeLib
 {
-    internal interface ISource
+    internal interface ISink
     {
         Task ProcessSourceAsync();
     }

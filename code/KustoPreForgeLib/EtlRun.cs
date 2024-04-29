@@ -1,7 +1,4 @@
-﻿using Kusto.Data.Common;
-using KustoPreForgeLib.BinarySinks;
-using KustoPreForgeLib.BlobEnumerables;
-using KustoPreForgeLib.LineBased;
+﻿using KustoPreForgeLib.BlobSources;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,14 +12,14 @@ namespace KustoPreForgeLib
     {
         public static async Task RunEtlAsync(
             EtlAction action,
-            IBlobEnumerable blobEnumerable,
+            IDataSource<BlobData> blobSource,
             RunningContext context)
         {
             var stopwatch = new Stopwatch();
 
             stopwatch.Start();
 
-            var etl = CreateEtl(action, blobEnumerable, context);
+            var etl = CreateEtl(action, blobSource, context);
 
             await etl.ProcessAsync();
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
@@ -30,7 +27,7 @@ namespace KustoPreForgeLib
 
         private static IEtl CreateEtl(
             EtlAction action,
-            IBlobEnumerable blobEnumerable,
+            IDataSource<BlobData> blobSource,
             RunningContext context)
         {
             switch (action)
@@ -38,7 +35,7 @@ namespace KustoPreForgeLib
                 case EtlAction.Split:
                     return CreateSplitEtl(context);
                 case EtlAction.PrePartition:
-                    return CreatePrePartitionEtl(blobEnumerable, context);
+                    return CreatePrePartitionEtl(blobSource, context);
 
                 default:
                     throw new NotSupportedException(action.ToString());
@@ -69,10 +66,10 @@ namespace KustoPreForgeLib
         }
 
         private static IEtl CreatePrePartitionEtl(
-            IBlobEnumerable blobEnumerable,
+            IDataSource<BlobData> blobSource,
             RunningContext context)
         {
-            return new SingleSourceEtl(new BlobSource(blobEnumerable));
+            return new SingleSourceEtl(UniversalSink.Create(blobSource));
         }
 
         //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
