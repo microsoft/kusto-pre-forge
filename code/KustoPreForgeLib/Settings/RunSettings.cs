@@ -5,16 +5,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib
+namespace KustoPreForgeLib.Settings
 {
     public class RunSettings
     {
         #region Properties
         public EtlAction Action { get; }
 
-        public AuthMode AuthMode { get; }
-
-        public string? ManagedIdentityResourceId { get; }
+        public AuthSettings AuthSettings { get; }
 
         public SourceSettings SourceSettings { get; }
 
@@ -51,8 +49,7 @@ namespace KustoPreForgeLib
 
             return new RunSettings(
                 eltAction,
-                authMode,
-                managedIdentityResourceId,
+                new AuthSettings(authMode, managedIdentityResourceId),
                 new SourceSettings(
                     serviceBusQueueUrl,
                     sourceBlob,
@@ -72,8 +69,7 @@ namespace KustoPreForgeLib
 
         public RunSettings(
             EtlAction? action,
-            AuthMode? authMode,
-            string? managedIdentityResourceId,
+            AuthSettings authSettings,
             SourceSettings sourceSettings,
             Uri? kustoIngestUri,
             string? kustoDb,
@@ -94,15 +90,9 @@ namespace KustoPreForgeLib
                     nameof(destinationBlobPrefix),
                     "No destination specified");
             }
-            if (AuthMode == AuthMode.ManagedIdentity
-                && string.IsNullOrWhiteSpace(managedIdentityResourceId))
-            {
-                throw new ArgumentNullException(nameof(managedIdentityResourceId));
-            }
 
             Action = action ?? EtlAction.Split;
-            AuthMode = authMode ?? AuthMode.Default;
-            ManagedIdentityResourceId = managedIdentityResourceId;
+            AuthSettings = authSettings;
             SourceSettings = sourceSettings;
             KustoIngestUri = kustoIngestUri;
             KustoDb = kustoDb;
@@ -260,8 +250,7 @@ namespace KustoPreForgeLib
         public void WriteOutSettings()
         {
             Console.WriteLine();
-            Console.WriteLine($"AuthMode:  {AuthMode}");
-            Console.WriteLine($"ManagedIdentityResourceId:  {ManagedIdentityResourceId}");
+            AuthSettings.WriteOutSettings();
             SourceSettings.WriteOutSettings();
             Console.WriteLine($"DestinationBlobPrefix:  {DestinationBlobPrefix}");
             Console.WriteLine($"KustoIngestUri:  {KustoIngestUri}");

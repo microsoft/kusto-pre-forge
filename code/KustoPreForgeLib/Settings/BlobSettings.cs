@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib
+namespace KustoPreForgeLib.Settings
 {
     public class BlobSettings
     {

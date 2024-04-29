@@ -1,4 +1,4 @@
-﻿namespace KustoPreForgeLib
+﻿namespace KustoPreForgeLib.Settings
 {
     public class SourceSettings
     {

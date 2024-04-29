@@ -7,6 +7,7 @@ using Kusto.Data;
 using Kusto.Data.Common;
 using Kusto.Data.Net.Client;
 using Kusto.Ingest;
+using KustoPreForgeLib.Settings;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -52,9 +53,6 @@ namespace KustoPreForgeLib
                         runSettings.KustoIngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
-            //var ingestionStagingContainers = runSettings.KustoIngestUri != null
-            //    ? await GetIngestionStagingContainersAsync(kustoAdminClient!)
-            //    : ImmutableArray<BlobContainerClient>.Empty;
 
             await Task.CompletedTask;
 
@@ -65,8 +63,6 @@ namespace KustoPreForgeLib
                 destinationBlobClient,
                 ingestClient,
                 ingestionPropertiesFactory);
-            //,
-            //    ingestionStagingContainers);
         }
 
         public RunningContext(
@@ -76,8 +72,6 @@ namespace KustoPreForgeLib
             BlockBlobClient? destinationBlobClient,
             IKustoQueuedIngestClient? ingestClient,
             Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory)
-            //,
-            //IImmutableList<BlobContainerClient> ingestionStagingContainers)
         {
             BlobSettings = blobSettings;
             Credentials = credentials;
@@ -85,21 +79,22 @@ namespace KustoPreForgeLib
             DestinationBlobClient = destinationBlobClient;
             IngestClient = ingestClient;
             _ingestionPropertiesFactory = ingestionPropertiesFactory;
-            //_ingestionStagingContainers = ingestionStagingContainers;
         }
 
         private static TokenCredential GetCredentials(RunSettings runSettings)
         {
-            switch (runSettings.AuthMode)
+            switch (runSettings.AuthSettings.AuthMode)
             {
                 case AuthMode.Default:
                     return new DefaultAzureCredential();
                 case AuthMode.ManagedIdentity:
                     return new ManagedIdentityCredential(
-                        new ResourceIdentifier(runSettings.ManagedIdentityResourceId!));
+                        new ResourceIdentifier(
+                            runSettings.AuthSettings.ManagedIdentityResourceId!));
 
                 default:
-                    throw new NotSupportedException($"Auth mode:  '{runSettings.AuthMode}'");
+                    throw new NotSupportedException(
+                        $"Auth mode:  '{runSettings.AuthSettings.AuthMode}'");
             }
         }
         #endregion
