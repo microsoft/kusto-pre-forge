@@ -58,8 +58,8 @@ jobs:
     - name: Retrieve container app
       run: |
         containerApp=$(az containerapp list -g ${{ secrets.RESOURCE_GROUP }} --query "[0].name" -o tsv)
-        echo "Container App:  $registry"
-        # echo "registry=$registry" >> $GITHUB_ENV
+        echo "Container App:  $containerApp"
+        echo "containerApp=$containerApp" >> $GITHUB_ENV
 
 
     # See https://learn.microsoft.com/en-us/azure/container-registry/container-registry-quickstart-task-cli
@@ -74,9 +74,7 @@ jobs:
           --image "kusto-pre-forge/dev:latest" \
           --registry $registry --name $registry \
           --force
-    # - name:  Update image in application
-    #   run:  |
-    #     az acr import --source "kusto-pre-forge/dev:${{ steps.patch-version.outputs.full-version }}" \
-    #       --image "kusto-pre-forge/dev:latest" \
-    #       --registry $registry --name $registry \
-    #       --force
+    - name:  Update revision in Container App
+      run:  |
+        az containerapp revision copy -g ${{ secrets.RESOURCE_GROUP }} -n $containerApp \
+          --image "kusto-pre-forge/dev:${{ steps.patch-version.outputs.full-version }}"
