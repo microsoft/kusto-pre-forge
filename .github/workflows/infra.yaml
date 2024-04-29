@@ -16,6 +16,6 @@ jobs:
 
     - name: Deploy infra
       run: |
-        cd deployment/registry
+        cd deployment/infra
         bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }} ${{ secrets.REGISTRY_NAME }}
 
