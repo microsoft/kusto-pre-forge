@@ -70,7 +70,7 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
     template: {
       containers: [
         {
-          image: '${registry.name}/a'
+          image: '${registry.name}/kusto-pre-forge/dev:latest'
           name: 'kusto-pre-forge'
           //  Total CPU and memory for all containers defined in a Container App must add up to one of the following CPU - Memory combinations:
           //  [cpu: 0.25, memory: 0.5Gi]; [cpu: 0.5, memory: 1.0Gi]; [cpu: 0.75, memory: 1.5Gi]; [cpu: 1.0, memory: 2.0Gi]; [cpu: 1.25, memory: 2.5Gi];
