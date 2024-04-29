@@ -1,164 +1,132 @@
-@description('App ID of the principal running the tests')
-param testIdentityId string
-
-@description('Object ID of the principal running the tests')
-param testIdentityObjectId string
-
-@description('Array of test case objects with properties "format", "blobFolder" & "table"')
-param testCases array
+@description('Name of the container registry')
+param registryName string
 
 @description('Location for all resources')
 param location string = resourceGroup().location
 
 var prefix = 'kpft'
 var suffix = uniqueString(resourceGroup().id)
-var clusterName = '${prefix}kusto${suffix}'
-var kustoDbName = 'test'
-var storageAccountName = '${prefix}storage${suffix}'
-var testContainerName = 'integrated-tests'
-var landingFolder = 'tests'
 
-module clusterModule '../../templates/cluster.bicep' = {
-  name: '${deployment().name}-cluster'
-  params: {
-    location: location
-    kustoClusterTier: 'Standard'
-    kustoClusterSku: 'Standard_E8ads_v5'
-    kustoClusterCapacity: 2
-    kustoClusterName: clusterName
-    kustoDbName: kustoDbName
-    doRunKustoDbScript: false
-  }
+//  Identity orchestrating, i.e. accessing Kusto + Storage
+resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${prefix}-app-identity-${suffix}'
+  location: location
 }
 
-resource testCluster 'Microsoft.Kusto/clusters@2023-05-02' existing = {
-  name: clusterName
-
-  resource Identifier 'principalAssignments' = {
-    name: 'testAdmin'
-    dependsOn: [ clusterModule ]
-
-    properties: {
-      principalId: testIdentityId
-      principalType: 'App'
-      role: 'AllDatabasesAdmin'
-    }
+resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
+  name: registryName
+  location: location
+  sku: {
+    name: 'Standard'
   }
-
-  resource db 'databases' existing = {
-    name: kustoDbName
-
-    //  Script to create all landing tables
-    resource script 'scripts' = {
-      name: 'schema'
-      dependsOn: [ clusterModule ]
-      properties: {
-        continueOnErrors: false
-        scriptContent: loadTextContent('schema.kql')
-      }
-    }
-  }
-}
-
-module storageModule '../../templates/storage.bicep' = {
-  name: '${deployment().name}-storage'
-  params: {
-    location: location
-    storageAccountName: storageAccountName
-    storageContainerName: testContainerName
-    eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
-  }
-}
-
-//  Add a container + policies to the storage account
-resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
-  name: storageAccountName
-
-  resource blobServices 'blobServices' existing = {
-    name: 'default'
-
-    resource testContainer 'containers' existing = {
-      name: testContainerName
-    }
-  }
-
-  resource policies 'managementPolicies' = {
-    name: 'default'
-    dependsOn: [ storageModule ]
-    properties: {
-      policy: {
-        rules: [
-          {
-            definition: {
-              actions: {
-                baseBlob: {
-                  delete: {
-                    daysAfterCreationGreaterThan: 1
-                  }
-                }
-              }
-              filters: {
-                prefixMatch: [
-                  '${testContainerName}/${landingFolder}/'
-                ]
-                blobTypes: [
-                  'blockBlob'
-                ]
-              }
-            }
-            enabled: true
-            name: 'clean-tests'
-            type: 'Lifecycle'
-          }
-        ]
-      }
-    }
-  }
-}
-
-//  Authorize principal to read / write storage (Storage Blob Data Contributor)
-resource appStorageRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(testIdentityObjectId, storageAccount.id, 'rbac')
-  scope: storageAccount::blobServices::testContainer
-  dependsOn: [ storageModule ]
-
   properties: {
-    description: 'Giving data contributor'
-    principalId: testIdentityObjectId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+    adminUserEnabled: true
+    anonymousPullEnabled: true
+    dataEndpointEnabled: false
+    policies: {
+      azureADAuthenticationAsArmPolicy: {
+        status: 'enabled'
+      }
+      retentionPolicy: {
+        status: 'disabled'
+      }
+      softDeletePolicy: {
+        status: 'disabled'
+      }
+    }
+    publicNetworkAccess: 'enabled'
+    zoneRedundancy: 'disabled'
   }
 }
 
-module folderHandle '../../templates/folder-handler.bicep' = [for (case, i) in testCases: {
-  name: '${deployment().name}-${i}'
+
+resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
+  name: '${prefix}-app-env-${suffix}'
+  location: location
+  sku: {
+    name: 'Consumption'
+  }
+  properties: {
+    zoneRedundant: false
+  }
+}
+
+resource app 'Microsoft.App/containerApps@2022-10-01' = {
+  name: 'dev-app'
+  location: location
   dependsOn: [
-    clusterModule
-    storageModule
   ]
-  params: {
-    location: location
-    appIdentityName: '${prefix}-app-id-${suffix}'
-    kustoClusterName: '${prefix}kusto${suffix}'
-    kustoDbName: 'test'
-    //  Kusto Table ???
-    serviceBusName: '${prefix}-service-bus-${suffix}'
-    serviceBusQueueName: case.table
-    storageAccountName: '${prefix}storage${suffix}'
-    storageContainerName: testContainerName
-    eventGridTopicName: '${prefix}-newBlobTopic-${suffix}'
-    //  Storage folder
-    eventGridSubscriptionName: case.table
-    appEnvironmentName: '${prefix}-app-env-${suffix}'
-    appName: 'app-${toLower(case.table)}'
-    tableName: case.table
-    format: case.format
-    inputCompression: case.inputCompression
-    blobFolder: 'tests/${case.blobFolder}'
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${appIdentity.id}': {}
+    }
+  }
+  properties: {
+    configuration: {
+      activeRevisionsMode: 'Single'
+    }
+    environmentId: appEnvironment.id
+    template: {
+      containers: [
+        {
+          image: '${registry.name}/a'
+          name: 'kusto-pre-forge'
+          //  Total CPU and memory for all containers defined in a Container App must add up to one of the following CPU - Memory combinations:
+          //  [cpu: 0.25, memory: 0.5Gi]; [cpu: 0.5, memory: 1.0Gi]; [cpu: 0.75, memory: 1.5Gi]; [cpu: 1.0, memory: 2.0Gi]; [cpu: 1.25, memory: 2.5Gi];
+          //  [cpu: 1.5, memory: 3.0Gi]; [cpu: 1.75, memory: 3.5Gi]; [cpu: 2.0, memory: 4.0Gi]
+          resources: {
+            cpu: '1'
+            memory: '2Gi'
+          }
+          env: [
+            {
+              name: 'AuthMode'
+              value: 'ManagedIdentity'
+            }
+            {
+              name: 'ManagedIdentityResourceId'
+              value: appIdentity.id
+            }
+            {
+              name: 'SourceBlobsPrefix'
+              value: ''
+            }
+            {
+              name: 'SourceBlobsSuffix'
+              value: ''
+            }
+            {
+              name: 'KustoIngestUri'
+              value: ''
+            }
+            {
+              name: 'KustoDb'
+              value: ''
+            }
+            {
+              name: 'KustoTable'
+              value: ''
+            }
+            {
+              name: 'Format'
+              value: 'csv'
+            }
+            {
+              name: 'InputCompression'
+              value: 'None'
+            }
+            {
+              name: 'OutputCompression'
+              value: 'None'
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 1
+      }
+    }
   }
 }
-]
-
-output storageLandingUrl string = '${storageAccount.properties.primaryEndpoints.blob}${testContainerName}/${landingFolder}'
-
-output clusterIngestionUri string = clusterModule.outputs.clusterIngestionUri

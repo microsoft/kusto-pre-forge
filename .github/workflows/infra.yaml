@@ -1,0 +1,21 @@
+name:  Registry
+
+on:
+  workflow_dispatch
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: Azure Login
+      run: az login --service-principal -u ${{ secrets.DEPLOY_CLIENT_ID }} -p ${{ secrets.DEPLOY_SECRET }} --tenant ${{ secrets.TENANT_ID }}
+    - name: Azure Subscription Set
+      run: az account set --name ${{ secrets.SUBSCRIPTION }}
+
+    - name: Deploy infra
+      run: |
+        cd deployment/registry
+        bash deploy-infra.sh ${{ secrets.RESOURCE_GROUP }} ${{ secrets.REGISTRY_NAME }}
+
