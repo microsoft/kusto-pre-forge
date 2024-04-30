@@ -58,6 +58,7 @@ namespace KustoPreForgeLib
             return IsAvailable(testBlock);
         }
 
+        #region Reservation
         public void Reserve(int offset, int length)
         {
             if (length < 0)
@@ -92,6 +93,27 @@ namespace KustoPreForgeLib
 
                     _reservedBlocks.Insert(newIndex, newBlock);
                     DoMerge(newIndex);
+                }
+            }
+        }
+
+        public Task ReserveAsync(int offset, int length)
+        {
+            lock (_lock)
+            {
+                if (IsAvailable(offset, length))
+                {
+                    return Task.CompletedTask;
+                }
+                else
+                {
+                    var source = new TaskCompletionSource();
+
+                    _preReservations.Add(new PreReservation(
+                        new MemoryBlock(offset, length),
+                        source));
+
+                    return source.Task;
                 }
             }
         }
@@ -166,27 +188,7 @@ namespace KustoPreForgeLib
                 RaiseTracking();
             }
         }
-
-        public Task ReserveAsync(int offset, int length)
-        {
-            lock (_lock)
-            {
-                if (IsAvailable(offset, length))
-                {
-                    return Task.CompletedTask;
-                }
-                else
-                {
-                    var source = new TaskCompletionSource();
-
-                    _preReservations.Add(new PreReservation(
-                        new MemoryBlock(offset, length),
-                        source));
-
-                    return source.Task;
-                }
-            }
-        }
+        #endregion
 
         private bool IsAvailable(MemoryBlock testBlock)
         {
