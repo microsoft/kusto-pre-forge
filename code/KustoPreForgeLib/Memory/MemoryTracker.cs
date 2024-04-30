@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib
+namespace KustoPreForgeLib.Memory
 {
     /// <summary>
     /// Tracker of memory blocks.  Keep no memory block itself.

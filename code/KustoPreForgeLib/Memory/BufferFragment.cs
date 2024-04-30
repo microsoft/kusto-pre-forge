@@ -1,14 +1,12 @@
-﻿using Kusto.Cloud.Platform.Utils;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KustoPreForgeLib
+namespace KustoPreForgeLib.Memory
 {
     /// <summary>Fragment of a byte buffer.</summary>>
     internal class BufferFragment : IEnumerable<byte>

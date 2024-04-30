@@ -1,4 +1,4 @@
-using KustoPreForgeLib;
+using KustoPreForgeLib.Memory;
 
 namespace UnitTests
 {
