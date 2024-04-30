@@ -23,7 +23,10 @@ namespace KustoPreForgeLib.Memory
             }
         }
 
-        private record PreReservation(MemoryInterval block, TaskCompletionSource source);
+        private record PreReservation(
+            MemoryInterval interval,
+            int? length,
+            TaskCompletionSource<MemoryInterval> source);
         #endregion
 
         private readonly object _lock = new();
@@ -88,12 +91,26 @@ namespace KustoPreForgeLib.Memory
                 }
                 else
                 {
-                    var source = new TaskCompletionSource();
+                    var source = new TaskCompletionSource<MemoryInterval>();
 
-                    _preReservations.Add(new PreReservation(interval, source));
+                    _preReservations.Add(new PreReservation(interval, null, source));
 
                     return source.Task;
                 }
+            }
+        }
+
+        /// <summary>Reserves a length of memory within an interval.</summary>>
+        /// <param name="interval"></param>
+        /// <param name="length"></param>
+        /// <returns></returns>
+        public Task<MemoryInterval> ReserveWithinAsync(
+            MemoryInterval interval,
+            int length)
+        {
+            lock (_lock)
+            {
+                throw new NotImplementedException();
             }
         }
         #endregion
@@ -167,18 +184,18 @@ namespace KustoPreForgeLib.Memory
         {
             lock (_lock)
             {
-                var trackersCopy = _preReservations.ToImmutableArray();
+                var preReservationsCopy = _preReservations.ToImmutableArray();
 
                 _preReservations.Clear();
-                foreach (var tracker in trackersCopy)
+                foreach (var preReservation in preReservationsCopy)
                 {
-                    if (IsAvailable(tracker.block))
+                    if (IsAvailable(preReservation.interval))
                     {
-                        tracker.source.SetResult();
+                        preReservation.source.SetResult(preReservation.interval);
                     }
                     else
                     {
-                        _preReservations.Add(tracker);
+                        _preReservations.Add(preReservation);
                     }
                 }
             }
