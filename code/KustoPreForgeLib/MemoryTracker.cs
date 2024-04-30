@@ -189,7 +189,6 @@ namespace KustoPreForgeLib
                 RaiseTracking();
             }
         }
-        #endregion
 
         private bool IsAvailable(MemoryBlock testBlock)
         {

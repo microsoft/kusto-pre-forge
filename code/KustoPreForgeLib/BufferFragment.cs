@@ -162,7 +162,7 @@ namespace KustoPreForgeLib
             _memoryTracker.Release(_bufferSubset.Offset, _bufferSubset.Length);
         }
 
-        public Task WaitForAvailabilityAsync()
+        public Task ReserveAsync()
         {
             return _memoryTracker.ReserveAsync(
                 _bufferSubset.Offset,
