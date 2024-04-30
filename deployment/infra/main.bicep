@@ -39,6 +39,19 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = 
   }
 }
 
+//  Authorize principal to ARC pull
+//  cf https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/containers#acrpull
+resource appRegistryRbacAuthorization 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(appIdentity.id, registry.id, 'rbac')
+  scope: registry
+
+  properties: {
+    description: 'Giving data contributor'
+    principalId: appIdentity.properties.clientId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+  }
+}
 
 resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
   name: '${prefix}-app-env-${suffix}'
@@ -54,8 +67,7 @@ resource appEnvironment 'Microsoft.App/managedEnvironments@2022-10-01' = {
 resource app 'Microsoft.App/containerApps@2022-10-01' = {
   name: 'dev-app'
   location: location
-  dependsOn: [
-  ]
+  dependsOn: []
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
