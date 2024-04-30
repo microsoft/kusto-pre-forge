@@ -13,75 +13,56 @@ namespace KustoPreForgeLib.Memory
     internal class MemoryTracker
     {
         #region Inner Types
-        private record MemoryBlock(int offset, int length)
+        private class MemoryBlockComparer : IComparer<MemoryInterval>
         {
-            public int End => offset + length;
+            public static IComparer<MemoryInterval> Singleton { get; } = new MemoryBlockComparer();
 
-            public bool HasOverlap(MemoryBlock other)
+            int IComparer<MemoryInterval>.Compare(MemoryInterval x, MemoryInterval y)
             {
-                return (other.offset >= offset && other.offset < End)
-                    || (other.End >= offset && other.End < End)
-                    || (other.offset <= offset && other.End >= End);
+                return x.Offset.CompareTo(y.Offset);
             }
         }
 
-        private class MemoryBlockComparer : IComparer<MemoryBlock>
-        {
-            public static IComparer<MemoryBlock> Singleton { get; } = new MemoryBlockComparer();
-
-            int IComparer<MemoryBlock>.Compare(MemoryBlock? x, MemoryBlock? y)
-            {
-                if (x == null)
-                {
-                    throw new ArgumentNullException(nameof(x));
-                }
-                if (y == null)
-                {
-                    throw new ArgumentNullException(nameof(y));
-                }
-
-                return x.offset.CompareTo(y.offset);
-            }
-        }
-
-        private record PreReservation(MemoryBlock block, TaskCompletionSource source);
+        private record PreReservation(MemoryInterval block, TaskCompletionSource source);
         #endregion
 
         private readonly object _lock = new();
-        private readonly List<MemoryBlock> _reservedBlocks = new();
+        private readonly List<MemoryInterval> _reservedIntervals = new();
         private readonly List<PreReservation> _preReservations = new();
 
-        public bool IsAvailable(int offset, int length)
+        public bool IsAvailable(MemoryInterval interval)
         {
-            var testBlock = new MemoryBlock(offset, length);
+            foreach (var block in _reservedIntervals)
+            {
+                if (block.HasOverlap(interval))
+                {
+                    return false;
+                }
+            }
 
-            return IsAvailable(testBlock);
+            return true;
         }
 
         #region Reservation
-        public void Reserve(int offset, int length)
+        public void Reserve(MemoryInterval interval)
         {
-            if (length < 0)
+            if (interval.Length < 0 || interval.Offset < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(length));
+                throw new ArgumentOutOfRangeException(nameof(interval));
             }
-            if (offset < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(offset));
-            }
-            if (length == 0)
+            if (interval.Length == 0)
             {
                 return;
             }
 
             lock (_lock)
             {
-                var newBlock = new MemoryBlock(offset, length);
-                var index = _reservedBlocks.BinarySearch(newBlock, MemoryBlockComparer.Singleton);
+                var index =
+                    _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
 
-                if (!IsAvailable(offset, length))
+                if (!IsAvailable(interval))
                 {
-                    throw new InvalidOperationException("Block isn't available to reserve");
+                    throw new InvalidOperationException("Interval isn't available to reserve");
                 }
                 if (index >= 0)
                 {   //  This should never be triggered
@@ -91,17 +72,17 @@ namespace KustoPreForgeLib.Memory
                 {
                     var newIndex = ~index;
 
-                    _reservedBlocks.Insert(newIndex, newBlock);
+                    _reservedIntervals.Insert(newIndex, interval);
                     DoMerge(newIndex);
                 }
             }
         }
 
-        public Task ReserveAsync(int offset, int length)
+        public Task ReserveAsync(MemoryInterval interval)
         {
             lock (_lock)
             {
-                if (IsAvailable(offset, length))
+                if (IsAvailable(interval))
                 {
                     return Task.CompletedTask;
                 }
@@ -109,9 +90,7 @@ namespace KustoPreForgeLib.Memory
                 {
                     var source = new TaskCompletionSource();
 
-                    _preReservations.Add(new PreReservation(
-                        new MemoryBlock(offset, length),
-                        source));
+                    _preReservations.Add(new PreReservation(interval, source));
 
                     return source.Task;
                 }
@@ -119,38 +98,32 @@ namespace KustoPreForgeLib.Memory
         }
         #endregion
 
-        public void Release(int offset, int length)
+        public void Release(MemoryInterval interval)
         {
-            if (length < 0)
+            if (interval.Length < 0 || interval.Offset < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(length));
+                throw new ArgumentOutOfRangeException(nameof(interval));
             }
-            if (offset < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(offset));
-            }
-            if (length == 0)
+            if (interval.Length == 0)
             {
                 return;
             }
             lock (_lock)
             {
-                var releaseBlock = new MemoryBlock(offset, length);
-                var index = _reservedBlocks.BinarySearch(
-                    releaseBlock,
-                    MemoryBlockComparer.Singleton);
+                var index =
+                    _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
 
                 if (index >= 0)
                 {   //  The offset match a block
-                    if (_reservedBlocks[index].length == length)
+                    if (_reservedIntervals[index].Length == interval.Length)
                     {   //  Exact match
-                        _reservedBlocks.RemoveAt(index);
+                        _reservedIntervals.RemoveAt(index);
                     }
-                    else if (_reservedBlocks[index].length > length)
+                    else if (_reservedIntervals[index].Length > interval.Length)
                     {   //  Existing block is bigger than release one
-                        _reservedBlocks[index] = new MemoryBlock(
-                            releaseBlock.End,
-                            _reservedBlocks[index].length - length);
+                        _reservedIntervals[index] = new MemoryInterval(
+                            interval.End,
+                            _reservedIntervals[index].Length - interval.Length);
                     }
                     else
                     {   //  Existing block is smaller than release one:  doesn't work
@@ -165,20 +138,20 @@ namespace KustoPreForgeLib.Memory
                     }
                     else
                     {
-                        if (_reservedBlocks[~index - 1].End > offset
-                            && _reservedBlocks[~index - 1].End >= releaseBlock.End)
+                        if (_reservedIntervals[~index - 1].End > interval.Offset
+                            && _reservedIntervals[~index - 1].End >= interval.End)
                         {
-                            var before = new MemoryBlock(
-                                _reservedBlocks[~index - 1].offset,
-                                offset - _reservedBlocks[~index - 1].offset);
-                            var after = new MemoryBlock(
-                                releaseBlock.End,
-                                _reservedBlocks[~index - 1].End - releaseBlock.End);
+                            var before = new MemoryInterval(
+                                _reservedIntervals[~index - 1].Offset,
+                                interval.Offset - _reservedIntervals[~index - 1].Offset);
+                            var after = new MemoryInterval(
+                                interval.End,
+                                _reservedIntervals[~index - 1].End - interval.End);
                             var validBlocks = new[] { before, after }
-                            .Where(b => b.length > 0);
+                            .Where(b => b.Length > 0);
 
-                            _reservedBlocks.RemoveAt(~index - 1);
-                            _reservedBlocks.InsertRange(~index - 1, validBlocks);
+                            _reservedIntervals.RemoveAt(~index - 1);
+                            _reservedIntervals.InsertRange(~index - 1, validBlocks);
                         }
                         else
                         {
@@ -188,19 +161,6 @@ namespace KustoPreForgeLib.Memory
                 }
                 RaiseTracking();
             }
-        }
-
-        private bool IsAvailable(MemoryBlock testBlock)
-        {
-            foreach (var block in _reservedBlocks)
-            {
-                if (block.HasOverlap(testBlock))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private void RaiseTracking()
@@ -226,25 +186,25 @@ namespace KustoPreForgeLib.Memory
 
         private void DoMerge(int newIndex)
         {
-            var newBlock = _reservedBlocks[newIndex];
+            var newBlock = _reservedIntervals[newIndex];
 
-            if (_reservedBlocks.Count > newIndex + 1
-                && _reservedBlocks[newIndex + 1].offset == newBlock.End)
+            if (_reservedIntervals.Count > newIndex + 1
+                && _reservedIntervals[newIndex + 1].Offset == newBlock.End)
             {   //  There is a block right after, let's merge
-                newBlock = new MemoryBlock(
-                    newBlock.offset,
-                    newBlock.length + _reservedBlocks[newIndex + 1].length);
-                _reservedBlocks.RemoveRange(newIndex, 2);
-                _reservedBlocks.Insert(newIndex, newBlock);
+                newBlock = new MemoryInterval(
+                    newBlock.Offset,
+                    newBlock.Length + _reservedIntervals[newIndex + 1].Length);
+                _reservedIntervals.RemoveRange(newIndex, 2);
+                _reservedIntervals.Insert(newIndex, newBlock);
             }
             if (newIndex > 0
-                && _reservedBlocks[newIndex - 1].End == newBlock.offset)
+                && _reservedIntervals[newIndex - 1].End == newBlock.Offset)
             {   //  There is a block right before, let's merge
-                newBlock = new MemoryBlock(
-                    _reservedBlocks[newIndex - 1].offset,
-                    newBlock.length + _reservedBlocks[newIndex - 1].length);
-                _reservedBlocks.RemoveRange(newIndex - 1, 2);
-                _reservedBlocks.Insert(newIndex - 1, newBlock);
+                newBlock = new MemoryInterval(
+                    _reservedIntervals[newIndex - 1].Offset,
+                    newBlock.Length + _reservedIntervals[newIndex - 1].Length);
+                _reservedIntervals.RemoveRange(newIndex - 1, 2);
+                _reservedIntervals.Insert(newIndex - 1, newBlock);
             }
         }
     }

@@ -24,7 +24,7 @@ namespace KustoPreForgeLib.Memory
         public static BufferFragment Create(int size)
         {
             return new BufferFragment(
-                new BufferSubset(new byte[size], 0, size),
+                new BufferSubset(new byte[size], new MemoryInterval(0, size)),
                 new MemoryTracker());
         }
         #endregion
@@ -33,13 +33,16 @@ namespace KustoPreForgeLib.Memory
             BufferSubset.Empty,
             new MemoryTracker());
 
-        public int Length => _bufferSubset.Length;
+        public int Length => _bufferSubset.Interval.Length;
 
         public bool Any() => Length > 0;
 
         public Memory<byte> ToMemoryBlock()
         {
-            return new Memory<byte>(_bufferSubset.Buffer, _bufferSubset.Offset, Length);
+            return new Memory<byte>(
+                _bufferSubset.Buffer,
+                _bufferSubset.Interval.Offset,
+                Length);
         }
 
         public override string ToString()
@@ -65,25 +68,27 @@ namespace KustoPreForgeLib.Memory
                     throw new ArgumentException(nameof(other), "Not related to same buffer");
                 }
 
-                var end = _bufferSubset.Offset + Length;
-                var otherEnd = other._bufferSubset.Offset + other.Length;
+                var end = _bufferSubset.Interval.Offset + Length;
+                var otherEnd = other._bufferSubset.Interval.Offset + other.Length;
 
-                if (end == other._bufferSubset.Offset)
+                if (end == other._bufferSubset.Interval.Offset)
                 {
                     return new BufferFragment(
                         new BufferSubset(
                             _bufferSubset.Buffer,
-                            _bufferSubset.Offset,
-                            Length + other.Length),
+                            new MemoryInterval(
+                                _bufferSubset.Interval.Offset,
+                                Length + other.Length)),
                         _memoryTracker);
                 }
-                else if (otherEnd == _bufferSubset.Offset)
+                else if (otherEnd == _bufferSubset.Interval.Offset)
                 {
                     return new BufferFragment(
                         new BufferSubset(
                             _bufferSubset.Buffer,
-                            other._bufferSubset.Offset,
-                            Length + other.Length),
+                            new MemoryInterval(
+                                other._bufferSubset.Interval.Offset,
+                                Length + other.Length)),
                         _memoryTracker);
                 }
                 else
@@ -118,13 +123,16 @@ namespace KustoPreForgeLib.Memory
             else
             {
                 var left = new BufferFragment(
-                    new BufferSubset(_bufferSubset.Buffer, _bufferSubset.Offset, index),
+                    new BufferSubset(
+                        _bufferSubset.Buffer,
+                        new MemoryInterval(_bufferSubset.Interval.Offset, index)),
                     _memoryTracker);
                 var right = new BufferFragment(
                     new BufferSubset(
                         _bufferSubset.Buffer,
-                        _bufferSubset.Offset + index,
-                        Length - index),
+                        new MemoryInterval(
+                            _bufferSubset.Interval.Offset + index,
+                            Length - index)),
                     _memoryTracker);
 
                 return (left, right);
@@ -135,9 +143,9 @@ namespace KustoPreForgeLib.Memory
         #region IEnumerable<byte>
         IEnumerator<byte> IEnumerable<byte>.GetEnumerator()
         {
-            var end = _bufferSubset.Offset + Length;
+            var end = _bufferSubset.Interval.End;
 
-            for (int i = _bufferSubset.Offset; i != end; ++i)
+            for (int i = _bufferSubset.Interval.Offset; i != end; ++i)
             {
                 yield return _bufferSubset.Buffer[i];
             }
@@ -152,17 +160,17 @@ namespace KustoPreForgeLib.Memory
         #region Memory Tracking
         public void Reserve()
         {
-            _memoryTracker.Reserve(_bufferSubset.Offset, _bufferSubset.Length);
+            _memoryTracker.Reserve(_bufferSubset.Interval);
         }
 
         public void Release()
         {
-            _memoryTracker.Release(_bufferSubset.Offset, _bufferSubset.Length);
+            _memoryTracker.Release(_bufferSubset.Interval);
         }
 
         public Task ReserveAsync()
         {
-            return _memoryTracker.ReserveAsync(_bufferSubset.Offset, _bufferSubset.Length);
+            return _memoryTracker.ReserveAsync(_bufferSubset.Interval);
         }
         #endregion
     }

@@ -8,7 +8,7 @@ namespace UnitTests
         public void AutomaticallyTracked()
         {
             var tracker = new MemoryTracker();
-            var task = tracker.ReserveAsync(0, 10);
+            var task = tracker.ReserveAsync(new MemoryInterval(0, 10));
 
             Assert.True(task.IsCompleted);
         }
@@ -18,12 +18,12 @@ namespace UnitTests
         {
             var tracker = new MemoryTracker();
 
-            tracker.Reserve(0, 10);
+            tracker.Reserve(new MemoryInterval(0, 10));
 
-            var task = tracker.ReserveAsync(0, 10);
+            var task = tracker.ReserveAsync(new MemoryInterval(0, 10));
 
             Assert.False(task.IsCompleted);
-            tracker.Release(0, 10);
+            tracker.Release(new MemoryInterval(0, 10));
             Assert.True(task.IsCompleted);
         }
 
@@ -32,14 +32,14 @@ namespace UnitTests
         {
             var tracker = new MemoryTracker();
 
-            tracker.Reserve(0, 10);
+            tracker.Reserve(new MemoryInterval(0, 10));
 
-            var task = tracker.ReserveAsync(0, 10);
+            var task = tracker.ReserveAsync(new MemoryInterval(0, 10));
 
             Assert.False(task.IsCompleted);
-            tracker.Release(0, 5);
+            tracker.Release(new MemoryInterval(0, 5));
             Assert.False(task.IsCompleted);
-            tracker.Release(5, 5);
+            tracker.Release(new MemoryInterval(5, 5));
             Assert.True(task.IsCompleted);
         }
 
@@ -48,16 +48,16 @@ namespace UnitTests
         {
             var tracker = new MemoryTracker();
 
-            tracker.Reserve(0, 10);
+            tracker.Reserve(new MemoryInterval(0, 10));
 
-            var task = tracker.ReserveAsync(0, 10);
+            var task = tracker.ReserveAsync(new MemoryInterval(0, 10));
 
             Assert.False(task.IsCompleted);
-            tracker.Release(0, 3);
+            tracker.Release(new MemoryInterval(0, 3));
             Assert.False(task.IsCompleted);
-            tracker.Release(7, 3);
+            tracker.Release(new MemoryInterval(7, 3));
             Assert.False(task.IsCompleted);
-            tracker.Release(3, 4);
+            tracker.Release(new MemoryInterval(3, 4));
             Assert.True(task.IsCompleted);
         }
     }
