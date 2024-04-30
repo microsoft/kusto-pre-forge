@@ -47,7 +47,7 @@ resource appRegistryRbacAuthorization 'Microsoft.Authorization/roleAssignments@2
 
   properties: {
     description: 'Giving data contributor'
-    principalId: appIdentity.properties.clientId
+    principalId: appIdentity.properties.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
   }
