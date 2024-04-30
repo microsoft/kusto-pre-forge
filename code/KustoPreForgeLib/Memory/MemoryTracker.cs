@@ -101,16 +101,25 @@ namespace KustoPreForgeLib.Memory
         }
 
         /// <summary>Reserves a length of memory within an interval.</summary>>
-        /// <param name="interval"></param>
-        /// <param name="length"></param>
+        /// <param name="interval">Interval to look within.</param>
+        /// <param name="length">Length of memory to reserve.</param>
         /// <returns></returns>
-        public Task<MemoryInterval> ReserveWithinAsync(
-            MemoryInterval interval,
-            int length)
+        public Task<MemoryInterval> ReserveWithinAsync(MemoryInterval interval, int length)
         {
             lock (_lock)
             {
-                throw new NotImplementedException();
+                if (InternalTryReserveWithin(interval, length, out var outputInterval))
+                {
+                    return Task.FromResult(outputInterval);
+                }
+                else
+                {
+                    var source = new TaskCompletionSource<MemoryInterval>();
+
+                    _preReservations.Add(new PreReservation(interval, length, source));
+
+                    return source.Task;
+                }
             }
         }
         #endregion
@@ -189,13 +198,26 @@ namespace KustoPreForgeLib.Memory
                 _preReservations.Clear();
                 foreach (var preReservation in preReservationsCopy)
                 {
-                    if (IsAvailable(preReservation.interval))
+                    if (preReservation.length == null)
                     {
-                        preReservation.source.SetResult(preReservation.interval);
+                        if (IsAvailable(preReservation.interval))
+                        {
+                            preReservation.source.SetResult(preReservation.interval);
+                        }
+                        else
+                        {
+                            _preReservations.Add(preReservation);
+                        }
                     }
                     else
                     {
-                        _preReservations.Add(preReservation);
+                        if (InternalTryReserveWithin(
+                            preReservation.interval,
+                            preReservation.length.Value,
+                            out var outputInterval))
+                        {
+                            preReservation.source.SetResult(outputInterval);
+                        }
                     }
                 }
             }
@@ -223,6 +245,14 @@ namespace KustoPreForgeLib.Memory
                 _reservedIntervals.RemoveRange(newIndex - 1, 2);
                 _reservedIntervals.Insert(newIndex - 1, newBlock);
             }
+        }
+
+        private bool InternalTryReserveWithin(
+            MemoryInterval interval,
+            int length,
+            out MemoryInterval outputInterval)
+        {
+            throw new NotImplementedException();
         }
     }
 }
