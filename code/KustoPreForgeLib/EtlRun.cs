@@ -1,5 +1,6 @@
 ﻿using KustoPreForgeLib.BlobSources;
 using KustoPreForgeLib.Settings;
+using KustoPreForgeLib.Transforms;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -76,7 +77,10 @@ namespace KustoPreForgeLib
             RunningContext context,
             PerfCounterJournal journal)
         {
-            return new SingleSourceEtl(UniversalSink.Create(blobSource, journal));
+            return new SingleSourceEtl(
+                UniversalSink.Create(
+                    new DownloadBlobTransform(blobSource, journal),
+                    journal));
         }
 
         //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
