@@ -164,9 +164,7 @@ namespace KustoPreForgeLib
 
         public Task ReserveAsync()
         {
-            return _memoryTracker.ReserveAsync(
-                _bufferSubset.Offset,
-                _bufferSubset.Length);
+            return _memoryTracker.ReserveAsync(_bufferSubset.Offset, _bufferSubset.Length);
         }
         #endregion
     }
