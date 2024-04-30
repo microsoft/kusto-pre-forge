@@ -117,6 +117,7 @@ namespace KustoPreForgeLib
                 }
             }
         }
+        #endregion
 
         public void Release(int offset, int length)
         {
