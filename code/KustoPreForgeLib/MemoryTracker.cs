@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
+    /// <summary>
+    /// Tracker of memory blocks.  Keep no memory block itself.
+    /// </summary>
     internal class MemoryTracker
     {
         #region Inner Types
@@ -21,8 +24,6 @@ namespace KustoPreForgeLib
                     || (other.offset <= offset && other.End >= End);
             }
         }
-
-        private record Tracker(MemoryBlock block, TaskCompletionSource source);
 
         private class MemoryBlockComparer : IComparer<MemoryBlock>
         {
@@ -42,11 +43,13 @@ namespace KustoPreForgeLib
                 return x.offset.CompareTo(y.offset);
             }
         }
+
+        private record PreReservation(MemoryBlock block, TaskCompletionSource source);
         #endregion
 
         private readonly object _lock = new();
         private readonly List<MemoryBlock> _reservedBlocks = new();
-        private readonly List<Tracker> _trackers = new();
+        private readonly List<PreReservation> _preReservations = new();
 
         public bool IsAvailable(int offset, int length)
         {
@@ -164,7 +167,7 @@ namespace KustoPreForgeLib
             }
         }
 
-        public Task TrackAsync(int offset, int length)
+        public Task ReserveAsync(int offset, int length)
         {
             lock (_lock)
             {
@@ -176,7 +179,7 @@ namespace KustoPreForgeLib
                 {
                     var source = new TaskCompletionSource();
 
-                    _trackers.Add(new Tracker(
+                    _preReservations.Add(new PreReservation(
                         new MemoryBlock(offset, length),
                         source));
 
@@ -202,9 +205,9 @@ namespace KustoPreForgeLib
         {
             lock (_lock)
             {
-                var trackersCopy = _trackers.ToImmutableArray();
+                var trackersCopy = _preReservations.ToImmutableArray();
 
-                _trackers.Clear();
+                _preReservations.Clear();
                 foreach (var tracker in trackersCopy)
                 {
                     if (IsAvailable(tracker.block))
@@ -213,7 +216,7 @@ namespace KustoPreForgeLib
                     }
                     else
                     {
-                        _trackers.Add(tracker);
+                        _preReservations.Add(tracker);
                     }
                 }
             }

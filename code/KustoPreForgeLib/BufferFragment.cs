@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib
 {
+    /// <summary>Fragment of a byte buffer.</summary>>
     internal class BufferFragment : IEnumerable<byte>
     {
         private readonly BufferSubset _bufferSubset;
@@ -161,9 +162,11 @@ namespace KustoPreForgeLib
             _memoryTracker.Release(_bufferSubset.Offset, _bufferSubset.Length);
         }
 
-        public Task TrackAsync()
+        public Task WaitForAvailabilityAsync()
         {
-            return _memoryTracker.TrackAsync(_bufferSubset.Offset, _bufferSubset.Length);
+            return _memoryTracker.ReserveAsync(
+                _bufferSubset.Offset,
+                _bufferSubset.Length);
         }
         #endregion
     }
