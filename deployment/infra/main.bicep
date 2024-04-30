@@ -93,6 +93,10 @@ resource app 'Microsoft.App/containerApps@2022-10-01' = {
           }
           env: [
             {
+              name: 'EtlAction'
+              value: 'PrePartition'
+            }
+            {
               name: 'AuthMode'
               value: 'ManagedIdentity'
             }
