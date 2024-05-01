@@ -106,6 +106,10 @@ namespace KustoPreForgeLib.Memory
         /// <returns></returns>
         public Task<MemoryInterval> ReserveWithinAsync(MemoryInterval interval, int length)
         {
+            if (length < 1 || length > interval.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
             lock (_lock)
             {
                 if (InternalTryReserveWithin(interval, length, out var outputInterval))
