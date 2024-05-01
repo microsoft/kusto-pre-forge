@@ -6,7 +6,7 @@ namespace KustoPreForgeLib.Transforms
 {
     internal class DownloadBlobTransform : IDataSource<BufferFragment>
     {
-        private const int MAX_READ_CONCURRENCY = 16;
+        private const int MAX_READ_CONCURRENCY = 32;
 
         private readonly BufferFragment _buffer;
         private readonly IDataSource<BlobData> _blobSource;
