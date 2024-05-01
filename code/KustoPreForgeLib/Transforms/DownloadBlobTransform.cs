@@ -6,7 +6,7 @@ namespace KustoPreForgeLib.Transforms
 {
     internal class DownloadBlobTransform : IDataSource<BufferFragment>
     {
-        private const int MAX_READ_CONCURRENCY = 32;
+        private const int MAX_READ_CONCURRENCY = 16;
 
         private readonly BufferFragment _buffer;
         private readonly IDataSource<BlobData> _blobSource;
@@ -47,9 +47,6 @@ namespace KustoPreForgeLib.Transforms
         {
             var data = await workQueue.WhenAnyAsync();
 
-            //  To remove
-            data.Data.Release();
-            
             return data;
         }
 
@@ -64,7 +61,7 @@ namespace KustoPreForgeLib.Transforms
 
             using (var readStream = await blobData.Data.BlobClient.OpenReadAsync(readOptions))
             {
-                var size = await readStream.ReadAsync(blobBuffer.ToMemoryBlock());
+                var size = await readStream.ReadAsync(blobBuffer.ToMemory());
 
                 if (size != blobBuffer.Length)
                 {

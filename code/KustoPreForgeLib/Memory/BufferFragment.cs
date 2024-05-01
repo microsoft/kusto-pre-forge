@@ -37,9 +37,25 @@ namespace KustoPreForgeLib.Memory
 
         public bool Any() => Length > 0;
 
-        public Memory<byte> ToMemoryBlock()
+        public Memory<byte> ToMemory()
         {
             return new Memory<byte>(
+                _bufferSubset.Buffer,
+                _bufferSubset.Interval.Offset,
+                Length);
+        }
+
+        public Span<byte> ToSpan()
+        {
+            return new Span<byte>(
+                _bufferSubset.Buffer,
+                _bufferSubset.Interval.Offset,
+                Length);
+        }
+
+        public MemoryStream ToMemoryStream()
+        {
+            return new MemoryStream(
                 _bufferSubset.Buffer,
                 _bufferSubset.Interval.Offset,
                 Length);

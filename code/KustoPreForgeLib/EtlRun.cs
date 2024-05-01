@@ -1,4 +1,5 @@
-﻿using KustoPreForgeLib.BlobSources;
+﻿using Kusto.Data.Common;
+using KustoPreForgeLib.BlobSources;
 using KustoPreForgeLib.Memory;
 using KustoPreForgeLib.Settings;
 using KustoPreForgeLib.Transforms;
@@ -80,11 +81,32 @@ namespace KustoPreForgeLib
             RunningContext context,
             PerfCounterJournal journal)
         {
-            var buffer = new BufferFragment(BUFFER_SIZE);
+            IDataSource<BufferFragment> CreateContentSource(DataSourceCompressionType type)
+            {
+                switch(type)
+                {
+                    case DataSourceCompressionType.None:
+                        return new DownloadBlobTransform(
+                            new BufferFragment(BUFFER_SIZE),
+                            blobSource,
+                            journal);
+                    case DataSourceCompressionType.GZip:
+                        return new GunzipContentTransform(
+                            new BufferFragment(BUFFER_SIZE/2),
+                            new DownloadBlobTransform(
+                                new BufferFragment(BUFFER_SIZE/2),
+                                blobSource,
+                                journal),
+                            journal);
+
+                    default:
+                        throw new NotSupportedException();
+                }
+            }
 
             return new SingleSourceEtl(
                 UniversalSink.Create(
-                    new DownloadBlobTransform(buffer, blobSource, journal),
+                    CreateContentSource(context.BlobSettings.InputCompression),
                     journal));
         }
 
