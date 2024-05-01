@@ -256,7 +256,40 @@ namespace KustoPreForgeLib.Memory
             int length,
             out MemoryInterval outputInterval)
         {
-            throw new NotImplementedException();
+            foreach (var availableInterval in EnumerateAvailableIntervals())
+            {
+                var clippedAvailableInterval = availableInterval.Intersect(interval);
+
+                if (clippedAvailableInterval.Length >= length)
+                {
+                    outputInterval = new MemoryInterval(clippedAvailableInterval.Offset, length);
+                    Reserve(outputInterval);
+
+                    return true;
+                }
+            }
+
+            outputInterval = new MemoryInterval();
+
+            return false;
+        }
+
+        /// <summary>This gives the inverse of reservations into the available intervals.</summary>
+        /// <returns></returns>
+        private IEnumerable<MemoryInterval> EnumerateAvailableIntervals()
+        {
+            var start = 0;
+
+            foreach (var reservation in _reservedIntervals)
+            {
+                if (reservation.Offset != start)
+                {
+                    yield return new MemoryInterval(start, reservation.Offset - start);
+                }
+                start = reservation.End;
+            }
+
+            yield return new MemoryInterval(start, int.MaxValue - start);
         }
     }
 }

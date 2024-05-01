@@ -13,9 +13,15 @@ namespace KustoPreForgeLib.Memory
 
         public bool HasOverlap(MemoryInterval other)
         {
-            return (other.Offset >= Offset && other.Offset < End)
-                || (other.End >= Offset && other.End < End)
-                || (other.Offset <= Offset && other.End >= End);
+            return Intersect(other).Length > 0;
+        }
+
+        public MemoryInterval Intersect(MemoryInterval interval)
+        {
+            var start = Math.Max(Offset, interval.Offset);
+            var end = Math.Min(End, interval.End);
+
+            return new MemoryInterval(start, Math.Max(0, end - start));
         }
 
         public override string ToString()
