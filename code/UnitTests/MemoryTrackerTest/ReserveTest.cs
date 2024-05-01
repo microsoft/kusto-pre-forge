@@ -1,8 +1,8 @@
 using KustoPreForgeLib.Memory;
 
-namespace UnitTests
+namespace UnitTests.MemoryTracker
 {
-    public class MemoryTrackerTest
+    public class ReserveTest
     {
         [Fact]
         public void AutomaticallyTracked()
