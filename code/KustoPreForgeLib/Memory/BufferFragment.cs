@@ -15,17 +15,17 @@ namespace KustoPreForgeLib.Memory
         private readonly MemoryTracker _memoryTracker;
 
         #region Constructors
+        public BufferFragment(int size)
+            : this(
+                  new BufferSubset(new byte[size], new MemoryInterval(0, size)),
+                  new MemoryTracker())
+        {
+        }
+
         private BufferFragment(BufferSubset bufferSubset, MemoryTracker memoryTracker)
         {
             _bufferSubset = bufferSubset;
             _memoryTracker = memoryTracker;
-        }
-
-        public static BufferFragment Create(int size)
-        {
-            return new BufferFragment(
-                new BufferSubset(new byte[size], new MemoryInterval(0, size)),
-                new MemoryTracker());
         }
         #endregion
 
@@ -171,6 +171,16 @@ namespace KustoPreForgeLib.Memory
         public Task ReserveAsync()
         {
             return _memoryTracker.ReserveAsync(_bufferSubset.Interval);
+        }
+
+        public async Task<BufferFragment> ReserveSubBufferAsync(int length)
+        {
+            var reservedInterval = await _memoryTracker.ReserveWithinAsync(
+                _bufferSubset.Interval,
+                length);
+            var reservedSubset = new BufferSubset(_bufferSubset.Buffer, reservedInterval);
+
+            return new BufferFragment(reservedSubset, _memoryTracker);
         }
         #endregion
     }

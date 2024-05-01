@@ -1,4 +1,5 @@
 ﻿using KustoPreForgeLib.BlobSources;
+using KustoPreForgeLib.Memory;
 using KustoPreForgeLib.Settings;
 using KustoPreForgeLib.Transforms;
 using System;
@@ -12,6 +13,8 @@ namespace KustoPreForgeLib
 {
     public static class EtlRun
     {
+        private const int BUFFER_SIZE = 100 * 1000000;
+
         public static async Task RunEtlAsync(
             EtlAction action,
             IDataSource<BlobData> blobSource,
@@ -77,9 +80,11 @@ namespace KustoPreForgeLib
             RunningContext context,
             PerfCounterJournal journal)
         {
+            var buffer = new BufferFragment(BUFFER_SIZE);
+
             return new SingleSourceEtl(
                 UniversalSink.Create(
-                    new DownloadBlobTransform(blobSource, journal),
+                    new DownloadBlobTransform(buffer, blobSource, journal),
                     journal));
         }
 
