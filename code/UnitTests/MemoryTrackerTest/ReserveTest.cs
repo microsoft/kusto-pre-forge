@@ -1,6 +1,6 @@
 using KustoPreForgeLib.Memory;
 
-namespace UnitTests.MemoryTracker
+namespace UnitTests.MemoryTrackerTest
 {
     public class ReserveTest
     {
