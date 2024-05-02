@@ -7,16 +7,13 @@ namespace KustoPreForgeLib.Transforms
 {
     internal class CsvParseTransform : IDataSource<CsvOutput>
     {
-        private readonly BufferFragment _buffer;
         private readonly IDataSource<BufferFragment> _contentSource;
         private readonly PerfCounterJournal _journal;
 
         public CsvParseTransform(
-            BufferFragment buffer,
             IDataSource<BufferFragment> contentSource,
             PerfCounterJournal journal)
         {
-            _buffer = buffer;
             _contentSource = contentSource;
             _journal = journal;
         }
@@ -30,6 +27,8 @@ namespace KustoPreForgeLib.Transforms
                 var inputBuffer = data.Data;
                 var output = Parse(inputBuffer);
 
+                //  To remove
+                inputBuffer.Release();
                 yield return new SourceData<CsvOutput>(
                     output,
                     null,

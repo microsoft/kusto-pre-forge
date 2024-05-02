@@ -81,21 +81,25 @@ namespace KustoPreForgeLib
             RunningContext context,
             PerfCounterJournal journal)
         {
-            IDataSource<BufferFragment> CreateContentSource(DataSourceCompressionType type)
+            IDataSource<CsvOutput> CreateContentSource(DataSourceCompressionType type)
             {
                 switch(type)
                 {
                     case DataSourceCompressionType.None:
-                        return new DownloadBlobTransform(
-                            new BufferFragment(BUFFER_SIZE),
-                            blobSource,
+                        return new CsvParseTransform(
+                            new DownloadBlobTransform(
+                                new BufferFragment(BUFFER_SIZE),
+                                blobSource,
+                                journal),
                             journal);
                     case DataSourceCompressionType.GZip:
-                        return new GunzipContentTransform(
-                            new BufferFragment(BUFFER_SIZE/2),
-                            new DownloadBlobTransform(
+                        return new CsvParseTransform(
+                            new GunzipContentTransform(
                                 new BufferFragment(BUFFER_SIZE/2),
-                                blobSource,
+                                new DownloadBlobTransform(
+                                    new BufferFragment(BUFFER_SIZE/2),
+                                    blobSource,
+                                    journal),
                                 journal),
                             journal);
 
