@@ -16,11 +16,7 @@ namespace KustoPreForgeLib.Settings
 
         public SourceSettings SourceSettings { get; }
 
-        public Uri? KustoIngestUri { get; }
-
-        public string? KustoDb { get; }
-
-        public string? KustoTable { get; }
+        public KustoSettings KustoSettings { get; }
 
         public Uri? DestinationBlobPrefix { get; }
 
@@ -102,9 +98,10 @@ namespace KustoPreForgeLib.Settings
             Action = action ?? EtlAction.Split;
             AuthSettings = authSettings;
             SourceSettings = sourceSettings;
-            KustoIngestUri = kustoIngestUri;
-            KustoDb = kustoDb;
-            KustoTable = kustoTable;
+            KustoSettings = new KustoSettings(
+                kustoIngestUri,
+                kustoDb,
+                kustoTable);
             DestinationBlobPrefix = destinationBlobPrefix;
             BlobSettings = blobSettings;
         }
@@ -261,9 +258,7 @@ namespace KustoPreForgeLib.Settings
             AuthSettings.WriteOutSettings();
             SourceSettings.WriteOutSettings();
             Console.WriteLine($"DestinationBlobPrefix:  {DestinationBlobPrefix}");
-            Console.WriteLine($"KustoIngestUri:  {KustoIngestUri}");
-            Console.WriteLine($"KustoDb:  {KustoDb}");
-            Console.WriteLine($"KustoTable:  {KustoTable}");
+            KustoSettings.WriteOutSettings();
             BlobSettings.WriteOutSettings();
             Console.WriteLine();
             Console.WriteLine($"Core count:  {Environment.ProcessorCount}");

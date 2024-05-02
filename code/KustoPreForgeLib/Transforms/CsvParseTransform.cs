@@ -8,13 +8,16 @@ namespace KustoPreForgeLib.Transforms
     internal class CsvParseTransform : IDataSource<CsvOutput>
     {
         private readonly IDataSource<BufferFragment> _contentSource;
+        private readonly IImmutableList<int> _columnIndexesToExtract;
         private readonly PerfCounterJournal _journal;
 
         public CsvParseTransform(
             IDataSource<BufferFragment> contentSource,
+            IImmutableList<int> columnIndexesToExtract,
             PerfCounterJournal journal)
         {
             _contentSource = contentSource;
+            _columnIndexesToExtract = columnIndexesToExtract;
             _journal = journal;
         }
 

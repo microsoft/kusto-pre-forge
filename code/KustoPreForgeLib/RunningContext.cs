@@ -26,6 +26,7 @@ namespace KustoPreForgeLib
         public static async Task<RunningContext> CreateAsync(RunSettings runSettings)
         {
             var blobSettings = runSettings.BlobSettings;
+            var kustoSettings = runSettings.KustoSettings;
             var credentials = runSettings.AuthSettings.GetCredentials();
             var sourceBlobClient = runSettings.SourceSettings.SourceBlob != null
                 ? new BlockBlobClient(runSettings.SourceSettings.SourceBlob, credentials)
@@ -33,26 +34,26 @@ namespace KustoPreForgeLib
             var destinationBlobClient = runSettings.DestinationBlobPrefix != null
                 ? new BlockBlobClient(runSettings.DestinationBlobPrefix, credentials)
                 : null;
-            var ingestClient = runSettings.KustoIngestUri != null
+            var ingestClient = kustoSettings.IngestUri != null
                 ? KustoIngestFactory.CreateQueuedIngestClient(
                     new KustoConnectionStringBuilder(
-                        runSettings.KustoIngestUri.ToString())
+                        kustoSettings.IngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
-            var ingestionPropertiesFactory = runSettings.KustoIngestUri != null
-                ? () => new KustoQueuedIngestionProperties(runSettings.KustoDb!, runSettings.KustoTable!)
+            var ingestionPropertiesFactory = kustoSettings.IngestUri != null
+                ? () => new KustoQueuedIngestionProperties(kustoSettings.Database!, kustoSettings.Table!)
                 {
                     Format = runSettings.BlobSettings.Format
                 }
                 : (Func<KustoQueuedIngestionProperties>?)null;
-            var kustoAdminClient = runSettings.KustoIngestUri != null
+            var kustoAdminIngestClient = kustoSettings.IngestUri != null
                 ? KustoClientFactory.CreateCslAdminProvider(
                     new KustoConnectionStringBuilder(
-                        runSettings.KustoIngestUri.ToString())
+                        kustoSettings.IngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
-
-            await Task.CompletedTask;
+            var kustoAdminEngineClient =
+                await FetchEngineAdminClientAsync(kustoAdminIngestClient, credentials);
 
             return new RunningContext(
                 blobSettings,
@@ -60,7 +61,8 @@ namespace KustoPreForgeLib
                 sourceBlobClient,
                 destinationBlobClient,
                 ingestClient,
-                ingestionPropertiesFactory);
+                ingestionPropertiesFactory,
+                kustoAdminEngineClient);
         }
 
         public RunningContext(
@@ -69,7 +71,8 @@ namespace KustoPreForgeLib
             BlockBlobClient? sourceBlobClient,
             BlockBlobClient? destinationBlobClient,
             IKustoQueuedIngestClient? ingestClient,
-            Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory)
+            Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory,
+            ICslAdminProvider? adminEngineClient)
         {
             BlobSettings = blobSettings;
             Credentials = credentials;
@@ -77,6 +80,28 @@ namespace KustoPreForgeLib
             DestinationBlobClient = destinationBlobClient;
             IngestClient = ingestClient;
             _ingestionPropertiesFactory = ingestionPropertiesFactory;
+            AdminEngineClient = adminEngineClient;
+        }
+
+        private static async Task<ICslAdminProvider?> FetchEngineAdminClientAsync(
+            ICslAdminProvider? ingestAdminClient, TokenCredential credentials)
+        {
+            if (ingestAdminClient != null)
+            {
+                var queryReader = await ingestAdminClient.ExecuteControlCommandAsync(
+                    string.Empty,
+                    ".show query service uri");
+                var queryUri = queryReader.ToDataSet().Tables[0].Rows[0][0].ToString();
+                var builder = new KustoConnectionStringBuilder(queryUri)
+                    .WithAadAzureTokenCredentialsAuthentication(credentials);
+                var engineAdminClient = KustoClientFactory.CreateCslAdminProvider(builder);
+
+                return engineAdminClient;
+            }
+            else
+            {
+                return null;
+            }
         }
         #endregion
 
@@ -89,6 +114,8 @@ namespace KustoPreForgeLib
         public BlockBlobClient? DestinationBlobClient { get; }
 
         public IKustoQueuedIngestClient? IngestClient { get; }
+        
+        public ICslAdminProvider? AdminEngineClient { get; }
 
         public KustoQueuedIngestionProperties CreateIngestionProperties()
         {
@@ -125,7 +152,8 @@ namespace KustoPreForgeLib
                 sourceBlobClient,
                 DestinationBlobClient,
                 IngestClient,
-                _ingestionPropertiesFactory);
+                _ingestionPropertiesFactory,
+                AdminEngineClient);
             //,
             //    _ingestionStagingContainers
         }

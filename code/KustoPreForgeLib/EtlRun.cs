@@ -1,10 +1,13 @@
-﻿using Kusto.Data.Common;
+﻿using Kusto.Cloud.Platform.Data;
+using Kusto.Data.Common;
 using KustoPreForgeLib.BlobSources;
 using KustoPreForgeLib.Memory;
 using KustoPreForgeLib.Settings;
 using KustoPreForgeLib.Transforms;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Data;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -17,7 +20,7 @@ namespace KustoPreForgeLib
         private const int BUFFER_SIZE = 100 * 1000000;
 
         public static async Task RunEtlAsync(
-            EtlAction action,
+            RunSettings runSettings,
             IDataSource<BlobData> blobSource,
             RunningContext context)
         {
@@ -26,7 +29,7 @@ namespace KustoPreForgeLib
             stopwatch.Start();
 
             var journal = new PerfCounterJournal();
-            var etl = CreateEtl(action, blobSource, context, journal);
+            var etl = await CreateEtlAsync(runSettings, blobSource, context, journal);
 
             journal.StartReporting();
             await etl.ProcessAsync();
@@ -35,21 +38,25 @@ namespace KustoPreForgeLib
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
         }
 
-        private static IEtl CreateEtl(
-            EtlAction action,
+        private static async Task<IEtl> CreateEtlAsync(
+            RunSettings runSettings,
             IDataSource<BlobData> blobSource,
             RunningContext context,
             PerfCounterJournal journal)
         {
-            switch (action)
+            switch (runSettings.Action)
             {
                 case EtlAction.Split:
                     return CreateSplitEtl(context, journal);
                 case EtlAction.PrePartition:
-                    return CreatePrePartitionEtl(blobSource, context, journal);
+                    return await CreatePrePartitionEtlAsync(
+                        blobSource,
+                        runSettings.KustoSettings,
+                        context,
+                        journal);
 
                 default:
-                    throw new NotSupportedException(action.ToString());
+                    throw new NotSupportedException(runSettings.Action.ToString());
             }
         }
 
@@ -76,30 +83,27 @@ namespace KustoPreForgeLib
             }
         }
 
-        private static IEtl CreatePrePartitionEtl(
+        private static async Task<IEtl> CreatePrePartitionEtlAsync(
             IDataSource<BlobData> blobSource,
+            KustoSettings kustoSettings,
             RunningContext context,
             PerfCounterJournal journal)
         {
-            IDataSource<CsvOutput> CreateContentSource(DataSourceCompressionType type)
+            IDataSource<BufferFragment> CreateContentSource(DataSourceCompressionType type)
             {
-                switch(type)
+                switch (type)
                 {
                     case DataSourceCompressionType.None:
-                        return new CsvParseTransform(
-                            new DownloadBlobTransform(
-                                new BufferFragment(BUFFER_SIZE),
-                                blobSource,
-                                journal),
+                        return new DownloadBlobTransform(
+                            new BufferFragment(BUFFER_SIZE),
+                            blobSource,
                             journal);
                     case DataSourceCompressionType.GZip:
-                        return new CsvParseTransform(
-                            new GunzipContentTransform(
-                                new BufferFragment(BUFFER_SIZE/2),
-                                new DownloadBlobTransform(
-                                    new BufferFragment(BUFFER_SIZE/2),
-                                    blobSource,
-                                    journal),
+                        return new GunzipContentTransform(
+                            new BufferFragment(BUFFER_SIZE / 2),
+                            new DownloadBlobTransform(
+                                new BufferFragment(BUFFER_SIZE / 2),
+                                blobSource,
                                 journal),
                             journal);
 
@@ -107,10 +111,51 @@ namespace KustoPreForgeLib
                         throw new NotSupportedException();
                 }
             }
+            async Task<int> FetchHashPartitionKeyColumnIndexAsync()
+            {
+                if (context.AdminEngineClient != null)
+                {
+                    throw new NotSupportedException(
+                        "Kusto must be destination for pre partitioning");
+                }
+                var policyReaderTask = context.AdminEngineClient!.ExecuteControlCommandAsync(
+                    kustoSettings.Database!,
+                    @"
+.show table Logs policy partitioning
+| project Keys=todynamic(Policy).PartitionKeys
+| mv-expand Keys
+| where Keys.Kind==""Hash""
+| project
+    ColumnName=tostring(Keys.ColumnName),
+    MaxPartitionCount = toint(Keys.Properties.MaxPartitionCount),
+    Seed = toint(Keys.Properties.Seed)");
+                var tableReader = await context.AdminEngineClient!.ExecuteControlCommandAsync(
+                    kustoSettings.Database!,
+                    @"
+.show table Logs
+| project AttributeName");
+                var policyReader = await policyReaderTask;
+                var policyRow = policyReader.ToDataSet().Tables[0].Rows[0];
+                var columnName = (string)policyRow["ColumnName"];
+                var maxPartitionCount = (int)policyRow["MaxPartitionCount"];
+                var seed = (int)policyRow["Seed"];
+                var columnNames = tableReader.ToDataSet().Tables[0].Rows
+                    .Cast<DataRow>()
+                    .Select(r => r[0].ToString())
+                    .ToImmutableArray();
+                var hashPartitionKeyColumnIndex = columnNames.IndexOf(columnName);
+
+                return hashPartitionKeyColumnIndex;
+            }
+
+            var hashPartitionKeyColumnIndex = await FetchHashPartitionKeyColumnIndexAsync();
 
             return new SingleSourceEtl(
                 UniversalSink.Create(
-                    CreateContentSource(context.BlobSettings.InputCompression),
+                    new CsvParseTransform(
+                        CreateContentSource(context.BlobSettings.InputCompression),
+                        new[] { hashPartitionKeyColumnIndex }.ToImmutableArray(),
+                        journal),
                     journal));
         }
 
