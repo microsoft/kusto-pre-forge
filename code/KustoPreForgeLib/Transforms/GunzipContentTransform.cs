@@ -31,8 +31,6 @@ namespace KustoPreForgeLib.Transforms
 
                 UncompressContent(inputBuffer, outputBuffer);
                 inputBuffer.Release();
-                //  To remove
-                outputBuffer.Release();
                 _journal.AddReading("Gunzip.Size", uncompressedSize);
 
                 yield return new SourceData<BufferFragment>(
