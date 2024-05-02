@@ -113,7 +113,7 @@ namespace KustoPreForgeLib
             }
             async Task<int> FetchHashPartitionKeyColumnIndexAsync()
             {
-                if (context.AdminEngineClient != null)
+                if (context.AdminEngineClient == null)
                 {
                     throw new NotSupportedException(
                         "Kusto must be destination for pre partitioning");
