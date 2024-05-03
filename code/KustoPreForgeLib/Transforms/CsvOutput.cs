@@ -11,5 +11,6 @@ namespace KustoPreForgeLib.Transforms
 {
     internal record CsvOutput(
         BufferFragment Content,
-        IImmutableList<int> RecordLengths);
+        IImmutableList<int> RecordLengths,
+        IImmutableList<MemoryInterval> PartitionValues);
 }

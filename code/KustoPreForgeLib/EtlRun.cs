@@ -154,7 +154,7 @@ namespace KustoPreForgeLib
                 UniversalSink.Create(
                     new CsvParseTransform(
                         CreateContentSource(context.BlobSettings.InputCompression),
-                        new[] { hashPartitionKeyColumnIndex }.ToImmutableArray(),
+                        hashPartitionKeyColumnIndex,
                         journal),
                     journal));
         }

@@ -8,16 +8,16 @@ namespace KustoPreForgeLib.Transforms
     internal class CsvParseTransform : IDataSource<CsvOutput>
     {
         private readonly IDataSource<BufferFragment> _contentSource;
-        private readonly IImmutableList<int> _columnIndexesToExtract;
+        private readonly int _columnIndexToExtract;
         private readonly PerfCounterJournal _journal;
 
         public CsvParseTransform(
             IDataSource<BufferFragment> contentSource,
-            IImmutableList<int> columnIndexesToExtract,
+            int columnIndexToExtract,
             PerfCounterJournal journal)
         {
             _contentSource = contentSource;
-            _columnIndexesToExtract = columnIndexesToExtract;
+            _columnIndexToExtract = columnIndexToExtract;
             _journal = journal;
         }
 
@@ -47,8 +47,11 @@ namespace KustoPreForgeLib.Transforms
             //  Essentially implementing a CSV in one method
             var inQuotes = false;
             var index = 0;
+            var columnIndex = 0;
             var recordStart = 0;
+            var columnStart = 0;
             var recordLengths = new List<int>();
+            var partitionValues = new List<MemoryInterval>();
 
             while (index < span.Length)
             {
@@ -76,12 +79,20 @@ namespace KustoPreForgeLib.Transforms
                 else if (currentChar == ',' && !inQuotes)
                 {
                     //  End of field, add current field to the current record
+                    if (columnIndex == _columnIndexToExtract)
+                    {
+                        partitionValues.Add(
+                            new MemoryInterval(columnStart, index - columnStart + 1));
+                    }
+                    columnStart = columnIndex + 1;
+                    ++columnIndex;
                 }
                 else if (currentChar == '\n' && !inQuotes)
                 {
                     // End of record, add current field to the current record and finalize the record
                     recordLengths.Add(index - recordStart + 1);
                     recordStart = index + 1;
+                    columnIndex = 0;
                 }
                 else
                 {
@@ -90,7 +101,10 @@ namespace KustoPreForgeLib.Transforms
                 ++index;
             }
 
-            return new CsvOutput(inputBuffer, recordLengths.ToImmutableArray());
+            return new CsvOutput(
+                inputBuffer,
+                recordLengths.ToImmutableArray(),
+                partitionValues.ToImmutableArray());
         }
     }
 }
