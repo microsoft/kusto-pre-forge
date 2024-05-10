@@ -123,7 +123,7 @@ namespace KustoPreForgeLib
 
             return new SingleSourceEtl(
                 new PartitionedContentSink(
-                    new TextPartitionTransform(
+                    new PartitioningTextTransform(
                         new BufferFragment(BUFFER_SIZE),
                         new CsvParseTransform(
                             CreateContentSource(context.BlobSettings.InputCompression),

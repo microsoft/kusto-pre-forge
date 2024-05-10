@@ -4,13 +4,13 @@ using System.Text;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal class TextPartitionTransform : IDataSource<SinglePartitionContent>
+    internal class PartitioningTextTransform : IDataSource<SinglePartitionContent>
     {
         private readonly BufferFragment _buffer;
         private readonly IDataSource<PartitionedTextContent> _contentSource;
         private readonly PerfCounterJournal _journal;
 
-        public TextPartitionTransform(
+        public PartitioningTextTransform(
             BufferFragment buffer,
             IDataSource<PartitionedTextContent> contentSource,
             PerfCounterJournal journal)
@@ -29,6 +29,11 @@ namespace KustoPreForgeLib.Transforms
                 var input = data.Data;
                 var partitionSizes = ComputePartitionSizes(input);
                 var sourceMemory = input.Content.ToMemory();
+                var partitionDisposables = ReferenceCounterDisposable.Create(
+                    partitionSizes.Count,
+                    data)
+                    .Zip(partitionSizes.Keys)
+                    .ToImmutableDictionary(p => p.Second, p => p.First);
 
                 foreach (var partitionId in partitionSizes.Keys)
                 {
@@ -62,7 +67,7 @@ namespace KustoPreForgeLib.Transforms
                         output,
                         null,
                         null,
-                        data);
+                        partitionDisposables[partitionId]);
                 }
                 //  Release the input buffer
                 input.Content.Release();

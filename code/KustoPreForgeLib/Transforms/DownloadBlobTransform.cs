@@ -72,7 +72,7 @@ namespace KustoPreForgeLib.Transforms
 
             return new SourceData<BufferFragment>(
                 blobBuffer,
-                null,
+                () => _journal.AddReading("DownloadBlob.BlobCommited", 1),
                 null,
                 blobData);
         }

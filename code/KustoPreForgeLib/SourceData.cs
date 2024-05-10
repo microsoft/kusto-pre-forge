@@ -12,6 +12,7 @@ namespace KustoPreForgeLib
         private readonly Action? _onDisposeAction;
         private readonly Func<Task>? _onDisposeAsyncAction;
         private readonly IImmutableList<IAsyncDisposable> _dependantDisposables;
+        private volatile int _disposedCount = 0;
 
         public SourceData(
             T data,
@@ -29,6 +30,10 @@ namespace KustoPreForgeLib
 
         async ValueTask IAsyncDisposable.DisposeAsync()
         {
+            if (Interlocked.CompareExchange(ref _disposedCount, 1, 0) != 0)
+            {
+                throw new InvalidOperationException("Already disposed");
+            }
             if (_onDisposeAction != null)
             {
                 _onDisposeAction();
