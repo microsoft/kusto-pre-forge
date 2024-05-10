@@ -88,7 +88,7 @@ namespace KustoPreForgeLib.Transforms
                     if (columnIndex == _columnIndexToExtract)
                     {
                         var columnMemory = inputBuffer.ToMemory()
-                            .Slice(columnStart, index - columnStart + 1);
+                            .Slice(columnStart, index - columnStart);
                         var partitionId = _partitionFunction(columnMemory);
 
                         if (!partitionValueSamples.ContainsKey(partitionId))
