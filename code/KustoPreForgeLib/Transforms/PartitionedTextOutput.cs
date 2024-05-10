@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal record CsvOutput(
+    internal record PartitionedTextOutput(
         BufferFragment Content,
         IImmutableList<int> RecordLengths,
         IImmutableList<MemoryInterval> PartitionValues);

@@ -5,7 +5,7 @@ using System.Reflection.PortableExecutable;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal class CsvParseTransform : IDataSource<CsvOutput>
+    internal class CsvParseTransform : IDataSource<PartitionedTextOutput>
     {
         private readonly IDataSource<BufferFragment> _contentSource;
         private readonly int _columnIndexToExtract;
@@ -21,8 +21,8 @@ namespace KustoPreForgeLib.Transforms
             _journal = journal;
         }
 
-        async IAsyncEnumerator<SourceData<CsvOutput>>
-            IAsyncEnumerable<SourceData<CsvOutput>>.GetAsyncEnumerator(
+        async IAsyncEnumerator<SourceData<PartitionedTextOutput>>
+            IAsyncEnumerable<SourceData<PartitionedTextOutput>>.GetAsyncEnumerator(
             CancellationToken cancellationToken)
         {
             await foreach (var data in _contentSource)
@@ -32,7 +32,7 @@ namespace KustoPreForgeLib.Transforms
 
                 //  To remove
                 inputBuffer.Release();
-                yield return new SourceData<CsvOutput>(
+                yield return new SourceData<PartitionedTextOutput>(
                     output,
                     null,
                     null,
@@ -40,7 +40,7 @@ namespace KustoPreForgeLib.Transforms
             }
         }
 
-        private CsvOutput Parse(BufferFragment inputBuffer)
+        private PartitionedTextOutput Parse(BufferFragment inputBuffer)
         {
             var span = inputBuffer.ToSpan();
             //  This whole algorithm was authored by chat GPT
@@ -101,7 +101,7 @@ namespace KustoPreForgeLib.Transforms
                 ++index;
             }
 
-            return new CsvOutput(
+            return new PartitionedTextOutput(
                 inputBuffer,
                 recordLengths.ToImmutableArray(),
                 partitionValues.ToImmutableArray());
