@@ -6,7 +6,7 @@ using System.Text;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal class CsvParseTransform : IDataSource<PartitionedTextOutput>
+    internal class CsvParseTransform : IDataSource<PartitionedTextContent>
     {
         private readonly IDataSource<BufferFragment> _contentSource;
         private readonly int _columnIndexToExtract;
@@ -26,8 +26,8 @@ namespace KustoPreForgeLib.Transforms
             _journal = journal;
         }
 
-        async IAsyncEnumerator<SourceData<PartitionedTextOutput>>
-            IAsyncEnumerable<SourceData<PartitionedTextOutput>>.GetAsyncEnumerator(
+        async IAsyncEnumerator<SourceData<PartitionedTextContent>>
+            IAsyncEnumerable<SourceData<PartitionedTextContent>>.GetAsyncEnumerator(
             CancellationToken cancellationToken)
         {
             await foreach (var data in _contentSource)
@@ -35,9 +35,7 @@ namespace KustoPreForgeLib.Transforms
                 var inputBuffer = data.Data;
                 var output = Parse(inputBuffer);
 
-                //  To remove
-                inputBuffer.Release();
-                yield return new SourceData<PartitionedTextOutput>(
+                yield return new SourceData<PartitionedTextContent>(
                     output,
                     null,
                     null,
@@ -45,7 +43,7 @@ namespace KustoPreForgeLib.Transforms
             }
         }
 
-        private PartitionedTextOutput Parse(BufferFragment inputBuffer)
+        private PartitionedTextContent Parse(BufferFragment inputBuffer)
         {
             var span = inputBuffer.ToSpan();
             //  This whole algorithm was authored by chat GPT
@@ -91,6 +89,7 @@ namespace KustoPreForgeLib.Transforms
                             .Slice(columnStart, index - columnStart);
                         var partitionId = _partitionFunction(columnMemory);
 
+                        partitionIds.Add(partitionId);
                         if (!partitionValueSamples.ContainsKey(partitionId))
                         {
                             var sample = GetSample(columnMemory);
@@ -115,7 +114,7 @@ namespace KustoPreForgeLib.Transforms
                 ++index;
             }
 
-            return new PartitionedTextOutput(
+            return new PartitionedTextContent(
                 inputBuffer,
                 recordLengths.ToImmutableArray(),
                 partitionIds.ToImmutableArray(),

@@ -8,8 +8,9 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal record SinglePartitionTextContent(
+    internal record SinglePartitionContent(
         BufferFragment Content,
         int partitionId,
         string partitionValueSample);
+
 }

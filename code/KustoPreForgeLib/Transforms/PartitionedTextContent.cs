@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal record PartitionedTextOutput(
+    internal record PartitionedTextContent(
         BufferFragment Content,
         IImmutableList<int> RecordLengths,
         IImmutableList<int> PartitionIds,

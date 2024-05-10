@@ -122,13 +122,16 @@ namespace KustoPreForgeLib
             var partitionConfig = await FetchPartitioningConfig(kustoSettings, context);
 
             return new SingleSourceEtl(
-                UniversalSink.Create(
-                    new CsvParseTransform(
-                        CreateContentSource(context.BlobSettings.InputCompression),
-                        partitionConfig.ColumnIndex,
-                        PartitioningHelper.GetPartitionStringFunction(
-                            partitionConfig.MaxPartitionCount,
-                            partitionConfig.Seed),
+                new PartitionedContentSink(
+                    new TextPartitionTransform(
+                        new BufferFragment(BUFFER_SIZE),
+                        new CsvParseTransform(
+                            CreateContentSource(context.BlobSettings.InputCompression),
+                            partitionConfig.ColumnIndex,
+                            PartitioningHelper.GetPartitionStringFunction(
+                                partitionConfig.MaxPartitionCount,
+                                partitionConfig.Seed),
+                            journal),
                         journal),
                     journal));
         }

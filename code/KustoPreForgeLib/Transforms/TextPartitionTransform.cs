@@ -1,20 +1,18 @@
 ﻿using KustoPreForgeLib.Memory;
 using System.Collections.Immutable;
-using System.IO.Compression;
-using System.Reflection.PortableExecutable;
 using System.Text;
 
 namespace KustoPreForgeLib.Transforms
 {
-    internal class TextPartitionTransform : IDataSource<SinglePartitionTextContent>
+    internal class TextPartitionTransform : IDataSource<SinglePartitionContent>
     {
         private readonly BufferFragment _buffer;
-        private readonly IDataSource<PartitionedTextOutput> _contentSource;
+        private readonly IDataSource<PartitionedTextContent> _contentSource;
         private readonly PerfCounterJournal _journal;
 
         public TextPartitionTransform(
             BufferFragment buffer,
-            IDataSource<PartitionedTextOutput> contentSource,
+            IDataSource<PartitionedTextContent> contentSource,
             PerfCounterJournal journal)
         {
             _buffer = buffer;
@@ -22,8 +20,8 @@ namespace KustoPreForgeLib.Transforms
             _journal = journal;
         }
 
-        async IAsyncEnumerator<SourceData<SinglePartitionTextContent>>
-            IAsyncEnumerable<SourceData<SinglePartitionTextContent>>.GetAsyncEnumerator(
+        async IAsyncEnumerator<SourceData<SinglePartitionContent>>
+            IAsyncEnumerable<SourceData<SinglePartitionContent>>.GetAsyncEnumerator(
             CancellationToken cancellationToken)
         {
             await foreach (var data in _contentSource)
@@ -37,7 +35,7 @@ namespace KustoPreForgeLib.Transforms
                     var subBuffer =
                         await _buffer.ReserveSubBufferAsync(partitionSizes[partitionId]);
                     var subBufferMemory = subBuffer.ToMemory();
-                    var output = new SinglePartitionTextContent(
+                    var output = new SinglePartitionContent(
                         subBuffer,
                         partitionId,
                         input.PartitionValueSamples[partitionId]);
@@ -60,7 +58,7 @@ namespace KustoPreForgeLib.Transforms
                         }
                     }
 
-                    yield return new SourceData<SinglePartitionTextContent>(
+                    yield return new SourceData<SinglePartitionContent>(
                         output,
                         null,
                         null,
@@ -71,7 +69,7 @@ namespace KustoPreForgeLib.Transforms
             }
         }
 
-        private IImmutableDictionary<int, int> ComputePartitionSizes(PartitionedTextOutput input)
+        private IImmutableDictionary<int, int> ComputePartitionSizes(PartitionedTextContent input)
         {
             var partitionSizes = new Dictionary<int, int>();
 
