@@ -17,6 +17,13 @@ namespace KustoPreForgeLib
 {
     public static class EtlRun
     {
+        #region Inner Types
+        private record PartitioningConfig(
+            int ColumnIndex,
+            int MaxPartitionCount,
+            int Seed);
+        #endregion
+
         private const int BUFFER_SIZE = 100 * 1000000;
 
         public static async Task RunEtlAsync(
@@ -111,16 +118,33 @@ namespace KustoPreForgeLib
                         throw new NotSupportedException();
                 }
             }
-            async Task<int> FetchHashPartitionKeyColumnIndexAsync()
+
+            var partitionConfig = await FetchPartitioningConfig(kustoSettings, context);
+
+            return new SingleSourceEtl(
+                UniversalSink.Create(
+                    new CsvParseTransform(
+                        CreateContentSource(context.BlobSettings.InputCompression),
+                        partitionConfig.ColumnIndex,
+                        PartitioningHelper.GetPartitionStringFunction(
+                            partitionConfig.MaxPartitionCount,
+                            partitionConfig.Seed),
+                        journal),
+                    journal));
+        }
+
+        private static async Task<PartitioningConfig> FetchPartitioningConfig(
+            KustoSettings kustoSettings,
+            RunningContext context)
+        {
+            if (context.AdminEngineClient == null)
             {
-                if (context.AdminEngineClient == null)
-                {
-                    throw new NotSupportedException(
-                        "Kusto must be destination for pre partitioning");
-                }
-                var policyReaderTask = context.AdminEngineClient!.ExecuteControlCommandAsync(
-                    kustoSettings.Database!,
-                    @"
+                throw new NotSupportedException(
+                    "Kusto must be destination for pre partitioning");
+            }
+            var policyReaderTask = context.AdminEngineClient!.ExecuteControlCommandAsync(
+                kustoSettings.Database!,
+                @"
 .show table Logs policy partitioning
 | project Keys=todynamic(Policy).PartitionKeys
 | mv-expand Keys
@@ -129,49 +153,26 @@ namespace KustoPreForgeLib
     ColumnName=tostring(Keys.ColumnName),
     MaxPartitionCount = toint(Keys.Properties.MaxPartitionCount),
     Seed = toint(Keys.Properties.Seed)");
-                var tableReader = await context.AdminEngineClient!.ExecuteControlCommandAsync(
-                    kustoSettings.Database!,
-                    @"
+            var tableReader = await context.AdminEngineClient!.ExecuteControlCommandAsync(
+                kustoSettings.Database!,
+                @"
 .show table Logs
 | project AttributeName");
-                var policyReader = await policyReaderTask;
-                var policyRow = policyReader.ToDataSet().Tables[0].Rows[0];
-                var columnName = (string)policyRow["ColumnName"];
-                var maxPartitionCount = (int)policyRow["MaxPartitionCount"];
-                var seed = (int)policyRow["Seed"];
-                var columnNames = tableReader.ToDataSet().Tables[0].Rows
-                    .Cast<DataRow>()
-                    .Select(r => r[0].ToString())
-                    .ToImmutableArray();
-                var hashPartitionKeyColumnIndex = columnNames.IndexOf(columnName);
+            var policyReader = await policyReaderTask;
+            var policyRow = policyReader.ToDataSet().Tables[0].Rows[0];
+            var columnName = (string)policyRow["ColumnName"];
+            var maxPartitionCount = (int)policyRow["MaxPartitionCount"];
+            var seed = (int)policyRow["Seed"];
+            var columnNames = tableReader.ToDataSet().Tables[0].Rows
+                .Cast<DataRow>()
+                .Select(r => r[0].ToString())
+                .ToImmutableArray();
+            var hashPartitionKeyColumnIndex = columnNames.IndexOf(columnName);
 
-                return hashPartitionKeyColumnIndex;
-            }
-
-            var hashPartitionKeyColumnIndex = await FetchHashPartitionKeyColumnIndexAsync();
-
-            return new SingleSourceEtl(
-                UniversalSink.Create(
-                    new CsvParseTransform(
-                        CreateContentSource(context.BlobSettings.InputCompression),
-                        hashPartitionKeyColumnIndex,
-                        journal),
-                    journal));
+            return new PartitioningConfig(
+                hashPartitionKeyColumnIndex,
+                maxPartitionCount,
+                seed);
         }
-
-        //private static Func<Memory<byte>?, string, ITextSink> GetStreamSinkFactory(
-        //    RunningContext context)
-        //{
-        //    if (context.IngestClient == null)
-        //    {
-        //        return (header, shardIndex) => new TextBlobSink(header, context, shardIndex);
-        //    }
-        //    else
-        //    {
-        //        var blobNamePrefix = Guid.NewGuid().ToString();
-
-        //        return (header, shardIndex) => new TextKustoSink(header, context, shardIndex, blobNamePrefix);
-        //    }
-        //}
     }
 }

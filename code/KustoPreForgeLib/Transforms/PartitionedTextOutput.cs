@@ -1,5 +1,4 @@
-﻿using Kusto.Cloud.Platform.Utils;
-using KustoPreForgeLib.Memory;
+﻿using KustoPreForgeLib.Memory;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -12,5 +11,6 @@ namespace KustoPreForgeLib.Transforms
     internal record PartitionedTextOutput(
         BufferFragment Content,
         IImmutableList<int> RecordLengths,
-        IImmutableList<MemoryInterval> PartitionValues);
+        IImmutableList<int> PartitionIds,
+        IImmutableDictionary<int, string> PartitionValueSamples);
 }

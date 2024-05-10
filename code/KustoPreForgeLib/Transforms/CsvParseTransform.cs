@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Reflection.PortableExecutable;
+using System.Text;
 
 namespace KustoPreForgeLib.Transforms
 {
@@ -9,15 +10,19 @@ namespace KustoPreForgeLib.Transforms
     {
         private readonly IDataSource<BufferFragment> _contentSource;
         private readonly int _columnIndexToExtract;
+        private readonly Func<ReadOnlyMemory<byte>, int> _partitionFunction;
         private readonly PerfCounterJournal _journal;
+        private readonly StringBuilder _builder = new ();
 
         public CsvParseTransform(
             IDataSource<BufferFragment> contentSource,
             int columnIndexToExtract,
+            Func<ReadOnlyMemory<byte>, int> partitionFunction,
             PerfCounterJournal journal)
         {
             _contentSource = contentSource;
             _columnIndexToExtract = columnIndexToExtract;
+            _partitionFunction = partitionFunction;
             _journal = journal;
         }
 
@@ -51,7 +56,8 @@ namespace KustoPreForgeLib.Transforms
             var recordStart = 0;
             var columnStart = 0;
             var recordLengths = new List<int>();
-            var partitionValues = new List<MemoryInterval>();
+            var partitionIds = new List<int>();
+            var partitionValueSamples = new Dictionary<int, string>();
 
             while (index < span.Length)
             {
@@ -81,10 +87,18 @@ namespace KustoPreForgeLib.Transforms
                     //  End of field, add current field to the current record
                     if (columnIndex == _columnIndexToExtract)
                     {
-                        partitionValues.Add(
-                            new MemoryInterval(columnStart, index - columnStart + 1));
+                        var columnMemory = inputBuffer.ToMemory()
+                            .Slice(columnStart, index - columnStart + 1);
+                        var partitionId = _partitionFunction(columnMemory);
+
+                        if (!partitionValueSamples.ContainsKey(partitionId))
+                        {
+                            var sample = GetSample(columnMemory);
+
+                            partitionValueSamples.Add(partitionId, sample);
+                        }
                     }
-                    columnStart = columnIndex + 1;
+                    columnStart = index + 1;
                     ++columnIndex;
                 }
                 else if (currentChar == '\n' && !inQuotes)
@@ -104,7 +118,19 @@ namespace KustoPreForgeLib.Transforms
             return new PartitionedTextOutput(
                 inputBuffer,
                 recordLengths.ToImmutableArray(),
-                partitionValues.ToImmutableArray());
+                partitionIds.ToImmutableArray(),
+                partitionValueSamples.ToImmutableDictionary());
+        }
+
+        private string GetSample(ReadOnlyMemory<byte> columnMemory)
+        {
+            _builder.Clear();
+            foreach(var b in columnMemory.Span)
+            {
+                _builder.Append((char)b);
+            }
+
+            return _builder.ToString();
         }
     }
 }
