@@ -78,6 +78,7 @@ namespace KustoPreForgeLib.Transforms
                 }
             }
             _journal.AddReading("DownloadBlob.BlobRead", 1);
+            _journal.AddReading("DownloadBlob.Size", blobData.Data.BlobSize);
 
             dataQueue.Enqueue(new SourceData<BufferFragment>(
                 blobBuffer,
