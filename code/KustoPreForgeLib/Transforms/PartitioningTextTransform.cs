@@ -39,7 +39,7 @@ namespace KustoPreForgeLib.Transforms
                 foreach (var partitionId in partitionSizes.Keys)
                 {
                     var subBuffer =
-                        await _buffer.ReserveSubBufferAsync(partitionSizes[partitionId]);
+                        await _buffer.ReserveSubBufferAsync(partitionSizes[partitionId] + 1);
                     var subBufferMemory = subBuffer.ToMemory();
                     var output = new SinglePartitionContent(
                         subBuffer,
@@ -58,12 +58,14 @@ namespace KustoPreForgeLib.Transforms
                             var length = recordLengths[i];
                             var source = sourceMemory.Slice(sourceOffset, length);
                             var destination = subBufferMemory.Slice(sourceOffset, length);
-                            
+
                             source.CopyTo(destination);
                             sourceOffset += length;
                             destinationOffset += length;
                         }
                     }
+                    //  Add return carriage to make sure we can concatenate those buffers
+                    subBuffer.ToSpan()[subBuffer.Length - 1] = (byte)'\n';
 
                     yield return new SourceData<SinglePartitionContent>(
                         output,
