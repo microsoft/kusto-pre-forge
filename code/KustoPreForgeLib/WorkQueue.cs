@@ -19,7 +19,6 @@ namespace KustoPreForgeLib
         private readonly ConcurrentQueue<int> _availableSlots = new();
         private readonly List<Task> _workingTasks;
         private readonly object _scheduleLock = new object();
-        private volatile int _usedCapacity = 0;
 
         public WorkQueue(int capacity)
         {
@@ -39,9 +38,9 @@ namespace KustoPreForgeLib
 
         public int Capacity { get; }
 
-        public bool HasCapacity => _usedCapacity < Capacity;
+        public bool HasCapacity => _availableSlots.Any();
 
-        public int UsedCapacity => _usedCapacity;
+        public int UsedCapacity => _workingTasks.Count - _availableSlots.Count;
 
         public bool HasResults => _completedTasks.Any();
 
@@ -68,7 +67,7 @@ namespace KustoPreForgeLib
         /// <returns>False iif no more work was enqueued when called.</returns>
         public async Task<bool> WhenAnyAsync()
         {
-            var isCapacityUsed = _usedCapacity > 0;
+            var isCapacityUsed = _availableSlots.Count < _workingTasks.Count;
 
             if (_completedTasks.TryDequeue(out var task))
             {
@@ -117,11 +116,9 @@ namespace KustoPreForgeLib
 
         private async Task ExecuteTaskAsync(int slot, Func<Task> asyncFunction)
         {
-            Interlocked.Increment(ref _usedCapacity);
             await asyncFunction();
             _completedTasks.Enqueue(_workingTasks[slot]);
             _availableSlots.Enqueue(slot);
-            Interlocked.Decrement(ref _usedCapacity);
             TryScheduleFunction();
         }
     }

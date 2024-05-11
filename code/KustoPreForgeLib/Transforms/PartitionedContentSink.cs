@@ -162,10 +162,6 @@ namespace KustoPreForgeLib.Transforms
                 }
                 writer.Push(data.Data);
                 await workQueue.ObserveCompletedAsync();
-                //data.Data.Content.Release();
-                //await using (data)
-                //{
-                //}
             }
             writer.Flush();
             await workQueue.WhenAllAsync();
