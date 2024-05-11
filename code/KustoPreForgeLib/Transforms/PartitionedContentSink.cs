@@ -99,6 +99,7 @@ namespace KustoPreForgeLib.Transforms
                 {
                     await context.Blob.StageBlockAsync(blockId, stream);
                 }
+                content.Content.Release();
                 writeCompletion.SetResult();
             }
 
