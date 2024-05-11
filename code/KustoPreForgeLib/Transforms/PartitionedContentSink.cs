@@ -1,4 +1,5 @@
 ﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
 using Kusto.Cloud.Platform.Utils;
 using KustoPreForgeLib.Memory;
 using System.Collections.Immutable;
@@ -11,8 +12,24 @@ namespace KustoPreForgeLib.Transforms
         #region Inner Types
         private class PartitionsWriter
         {
+            #region Inner Types
+            private struct PartitionContext
+            {
+                public BlockBlobClient Blob;
+
+                public string PartitionValueSample;
+
+                public int BlockCount;
+
+                public List<Task> BlockWriteTasks;
+            }
+            #endregion
+
             private readonly WorkQueue _workQueue;
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
+            private readonly IDictionary<int, PartitionContext> _partitionContextMap =
+                new Dictionary<int, PartitionContext>();
+            private int _stagingContainerIndex = 0;
 
             public PartitionsWriter(
                 WorkQueue workQueue,
@@ -24,12 +41,59 @@ namespace KustoPreForgeLib.Transforms
 
             public void Push(SinglePartitionContent content)
             {
-                throw new NotImplementedException();
+                if (!_partitionContextMap.ContainsKey(content.PartitionId))
+                {
+                    var container = _stagingContainers[_stagingContainerIndex];
+                    var blob = container.GetBlockBlobClient(Guid.NewGuid().ToString());
+                    var newContext = new PartitionContext
+                    {
+                        Blob = blob,
+                        PartitionValueSample = content.PartitionValueSample,
+                        BlockCount = 0,
+                        BlockWriteTasks = new List<Task>()
+                    };
+
+                    _stagingContainerIndex = (_stagingContainerIndex + 1)
+                        % _stagingContainers.Count;
+                    _partitionContextMap[content.PartitionId] = newContext;
+                }
+
+                var context = _partitionContextMap[content.PartitionId];
+                var blockIndex = context.BlockCount++;
+                var writeCompletion = new TaskCompletionSource();
+
+                context.BlockWriteTasks.Add(writeCompletion.Task);
+                _workQueue.QueueWorkItem(() => WriteBlockAsync(
+                    context,
+                    content,
+                    GetBlockId(blockIndex),
+                    writeCompletion));
             }
 
             public void Flush()
             {
                 throw new NotImplementedException();
+            }
+
+            private static string GetBlockId(int blockIndex)
+            {
+                var blockId = Convert.ToBase64String(
+                    Encoding.UTF8.GetBytes(blockIndex.ToString()));
+
+                return blockId;
+            }
+
+            private async Task WriteBlockAsync(
+                PartitionContext context,
+                SinglePartitionContent content,
+                string blockId,
+                TaskCompletionSource writeCompletion)
+            {
+                using (var stream = content.Content.ToMemoryStream())
+                {
+                    await context.Blob.StageBlockAsync(blockId, stream);
+                }
+                writeCompletion.SetResult();
             }
         }
         #endregion
@@ -66,7 +130,7 @@ namespace KustoPreForgeLib.Transforms
             await foreach (var data in _contentSource)
             {
                 if (data.Data.UnitId != lastUnitId
-                    && intervalStart + _flushInterval > DateTime.Now)
+                    && intervalStart + _flushInterval < DateTime.Now)
                 {
                     writer.Flush();
                     writer = writerFactory();
@@ -79,6 +143,7 @@ namespace KustoPreForgeLib.Transforms
                 //{
                 //}
             }
+            writer.Flush();
             await workQueue.WhenAllAsync();
         }
     }
