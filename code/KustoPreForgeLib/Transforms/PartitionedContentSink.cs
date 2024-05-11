@@ -26,6 +26,7 @@ namespace KustoPreForgeLib.Transforms
             #endregion
 
             private readonly WorkQueue _workQueue;
+            private readonly PerfCounterJournal _journal;
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
             private readonly IDictionary<int, PartitionContext> _partitionContextMap =
                 new Dictionary<int, PartitionContext>();
@@ -33,9 +34,11 @@ namespace KustoPreForgeLib.Transforms
 
             public PartitionsWriter(
                 WorkQueue workQueue,
+                PerfCounterJournal journal,
                 IImmutableList<BlobContainerClient> stagingContainers)
             {
                 _workQueue = workQueue;
+                _journal = journal;
                 _stagingContainers = stagingContainers;
             }
 
@@ -101,6 +104,9 @@ namespace KustoPreForgeLib.Transforms
                 }
                 content.Content.Release();
                 writeCompletion.SetResult();
+                _journal.AddReading(
+                    "PartitionedContentSink.Write.Size",
+                    content.Content.Length);
             }
 
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
@@ -139,6 +145,7 @@ namespace KustoPreForgeLib.Transforms
             var workQueue = new WorkQueue(MAX_PARALLEL_WRITES);
             Func<PartitionsWriter> writerFactory = () => new PartitionsWriter(
                 workQueue,
+                _journal,
                 _stagingContainers);
             var writer = writerFactory();
             var intervalStart = DateTime.Now;
