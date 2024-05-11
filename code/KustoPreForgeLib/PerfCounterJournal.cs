@@ -65,7 +65,7 @@ namespace KustoPreForgeLib
 
             foreach (var perfCounter in counters)
             {
-                Console.WriteLine($"{perfCounter.Name}:  {perfCounter.SumValue}");
+                Console.WriteLine($"{perfCounter.Name}:  {perfCounter.SumValue:#,##0}");
             }
             Console.WriteLine();
         }
