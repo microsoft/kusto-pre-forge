@@ -72,7 +72,13 @@ namespace KustoPreForgeLib.Transforms
 
             public void Flush()
             {
-                throw new NotImplementedException();
+                foreach (var context in _partitionContextMap.Values)
+                {
+                    //  Avoid capture of variable
+                    var partitionContext = context;
+
+                    _workQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
+                }
             }
 
             private static string GetBlockId(int blockIndex)
@@ -94,6 +100,16 @@ namespace KustoPreForgeLib.Transforms
                     await context.Blob.StageBlockAsync(blockId, stream);
                 }
                 writeCompletion.SetResult();
+            }
+
+            private async Task FlushPartitionAsync(PartitionContext partitionContext)
+            {
+                await Task.WhenAll(partitionContext.BlockWriteTasks);
+
+                var blockIds = Enumerable.Range(0, partitionContext.BlockCount)
+                    .Select(index => GetBlockId(index));
+
+                await partitionContext.Blob.CommitBlockListAsync(blockIds);
             }
         }
         #endregion
