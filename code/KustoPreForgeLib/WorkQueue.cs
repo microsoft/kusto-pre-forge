@@ -54,6 +54,16 @@ namespace KustoPreForgeLib
             TryScheduleFunction();
         }
 
+        /// <summary>Observe all completed tasks.</summary>>
+        /// <returns></returns>
+        public async Task ObserveCompletedAsync()
+        {
+            while (_completedTasks.TryDequeue(out var task))
+            {
+                await task;
+            }
+        }
+
         /// <summary>Awaits one task to be completed.</summary>>
         /// <returns>False iif no more work was enqueued when called.</returns>
         public async Task<bool> WhenAnyAsync()
@@ -80,10 +90,7 @@ namespace KustoPreForgeLib
 
         public async Task WhenAllAsync()
         {
-            while (_completedTasks.TryDequeue(out var task))
-            {
-                await task;
-            }
+            await ObserveCompletedAsync();
             while (await WhenAnyAsync())
             {
             }

@@ -10,7 +10,7 @@ namespace KustoPreForgeLib.Transforms
 {
     internal record SinglePartitionContent(
         BufferFragment Content,
-        int partitionId,
-        string partitionValueSample);
-
+        Guid UnitId,
+        int PartitionId,
+        string PartitionValueSample);
 }

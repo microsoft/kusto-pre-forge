@@ -49,6 +49,7 @@ namespace KustoPreForgeLib.Transforms
                     }
                 }
                 workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, dataQueue));
+                await workQueue.ObserveCompletedAsync();
             }
             await workQueue.WhenAllAsync();
             while (dataQueue.TryDequeue(out var contentData))

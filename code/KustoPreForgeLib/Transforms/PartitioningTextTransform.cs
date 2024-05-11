@@ -34,6 +34,7 @@ namespace KustoPreForgeLib.Transforms
                     data)
                     .Zip(partitionSizes.Keys)
                     .ToImmutableDictionary(p => p.Second, p => p.First);
+                var unitId = Guid.NewGuid();
 
                 foreach (var partitionId in partitionSizes.Keys)
                 {
@@ -42,6 +43,7 @@ namespace KustoPreForgeLib.Transforms
                     var subBufferMemory = subBuffer.ToMemory();
                     var output = new SinglePartitionContent(
                         subBuffer,
+                        unitId,
                         partitionId,
                         input.PartitionValueSamples[partitionId]);
                     var recordLengths = input.RecordLengths;
