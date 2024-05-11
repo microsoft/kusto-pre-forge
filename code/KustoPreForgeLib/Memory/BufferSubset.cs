@@ -23,7 +23,7 @@
         public override string ToString()
         {
             return $"({Interval.Offset}, {(Interval.Offset + Interval.Length)}):"
-                + $"  Length = {Buffer.Length}";
+                + $"  Length = {Interval.Length}";
         }
     }
 }
