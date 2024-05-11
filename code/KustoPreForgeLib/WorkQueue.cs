@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -8,38 +9,113 @@ using System.Threading.Tasks;
 namespace KustoPreForgeLib
 {
     /// <summary>
-    /// Component keeping track of multiple asynchronous tasks.
-    /// This isn't multithreaded and is assumed to be used one method call at the time.
+    /// Component keeping track of multiple asynchronous tasks and able to queue more than
+    /// its capacity.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    internal class WorkQueue<T>
+    internal class WorkQueue
     {
-        private readonly List<Task<T>> _queue = new();
+        private readonly ConcurrentQueue<Func<Task>> _asyncFunctionQueue = new();
+        private readonly ConcurrentQueue<Task> _completedTasks = new();
+        private readonly ConcurrentQueue<int> _availableSlots = new();
+        private readonly List<Task> _workingTasks;
+        private readonly object _scheduleLock = new object();
+        private volatile int _usedCapacity = 0;
 
-        public int Count => _queue.Count;
-
-        public void AddWorkItem(Task<T> task)
+        public WorkQueue(int capacity)
         {
-            _queue.Add(task);
+            if (capacity <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(capacity));
+            }
+            Capacity = capacity;
+            _workingTasks = new List<Task>(capacity);
+            //  Pre-populate
+            for (int i = 0; i < Capacity; i++)
+            {
+                _availableSlots.Enqueue(i);
+                _workingTasks.Add(Task.CompletedTask);
+            }
         }
 
-        public async Task<T> WhenAnyAsync()
+        public int Capacity { get; }
+
+        public bool HasCapacity => _usedCapacity < Capacity;
+
+        public int UsedCapacity => _usedCapacity;
+
+        public bool HasResults => _completedTasks.Any();
+
+        /// <summary>Queue a work item.</summary>
+        /// <param name="asyncFunction"></param>
+        /// <exception cref="NotImplementedException"></exception>
+        public void QueueWorkItem(Func<Task> asyncFunction)
         {
-            await Task.WhenAny(_queue);
+            _asyncFunctionQueue.Enqueue(asyncFunction);
+            TryScheduleFunction();
+        }
 
-            for (int i = 0; i != _queue.Count; i++)
+        /// <summary>Awaits one task to be completed.</summary>>
+        /// <returns>False iif no more work was enqueued when called.</returns>
+        public async Task<bool> WhenAnyAsync()
+        {
+            var isCapacityUsed = _usedCapacity > 0;
+
+            if (_completedTasks.TryDequeue(out var task))
             {
-                if (_queue[i].IsCompleted)
+                await task;
+
+                return true;
+            }
+            else if (!isCapacityUsed)
+            {
+                return false;
+            }
+            else
+            {
+                await Task.Delay(TimeSpan.FromSeconds(0.1));
+
+                return await WhenAnyAsync();
+            }
+        }
+
+        public async Task WhenAllAsync()
+        {
+            while (_completedTasks.TryDequeue(out var task))
+            {
+                await task;
+            }
+            while (await WhenAnyAsync())
+            {
+            }
+        }
+
+        private void TryScheduleFunction()
+        {
+            lock (_scheduleLock)
+            {
+                if (_availableSlots.TryDequeue(out var availableSlot))
                 {
-                    var value = await _queue[i];
-
-                    _queue.RemoveAt(i);
-
-                    return value;
+                    if (_asyncFunctionQueue.TryDequeue(out var asyncFunction))
+                    {
+                        _workingTasks[availableSlot] =
+                            ExecuteTaskAsync(availableSlot, asyncFunction);
+                    }
+                    else
+                    {
+                        _availableSlots.Enqueue(availableSlot);
+                    }
                 }
             }
+        }
 
-            throw new InvalidOperationException("Can't find completed task");
+        private async Task ExecuteTaskAsync(int slot, Func<Task> asyncFunction)
+        {
+            Interlocked.Increment(ref _usedCapacity);
+            await asyncFunction();
+            _completedTasks.Enqueue(_workingTasks[slot]);
+            _availableSlots.Enqueue(slot);
+            Interlocked.Decrement(ref _usedCapacity);
+            TryScheduleFunction();
         }
     }
 }

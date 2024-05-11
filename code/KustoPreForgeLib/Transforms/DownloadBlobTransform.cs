@@ -1,6 +1,7 @@
 ﻿using Azure.Storage.Blobs.Models;
 using KustoPreForgeLib.BlobSources;
 using KustoPreForgeLib.Memory;
+using System.Collections.Concurrent;
 
 namespace KustoPreForgeLib.Transforms
 {
@@ -26,32 +27,39 @@ namespace KustoPreForgeLib.Transforms
             IAsyncEnumerable<SourceData<BufferFragment>>.GetAsyncEnumerator(
             CancellationToken cancellationToken)
         {
-            var workQueue = new WorkQueue<SourceData<BufferFragment>>();
+            var dataQueue = new ConcurrentQueue<SourceData<BufferFragment>>();
+            var workQueue = new WorkQueue(MAX_READ_CONCURRENCY);
 
             await foreach (var blobData in _blobSource)
-            {
-                if (workQueue.Count == MAX_READ_CONCURRENCY)
+            {   //  Avoid context capture
+                var data = blobData;
+
+                if (!workQueue.HasCapacity)
                 {
-                    yield return await PumpContentOutAsync(workQueue);
+                    await workQueue.WhenAnyAsync();
+
+                    if (dataQueue.TryDequeue(out var contentData))
+                    {
+                        yield return contentData;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            "There should be data in the data queue at this point");
+                    }
                 }
-                workQueue.AddWorkItem(LoadBlobAsync(blobData));
+                workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, dataQueue));
             }
-            while (workQueue.Count > 0)
+            await workQueue.WhenAllAsync();
+            while (dataQueue.TryDequeue(out var contentData))
             {
-                yield return await PumpContentOutAsync(workQueue);
+                yield return contentData;
             }
         }
 
-        private static async Task<SourceData<BufferFragment>> PumpContentOutAsync(
-            WorkQueue<SourceData<BufferFragment>> workQueue)
-        {
-            var data = await workQueue.WhenAnyAsync();
-
-            return data;
-        }
-
-        private async Task<SourceData<BufferFragment>> LoadBlobAsync(
-            SourceData<BlobData> blobData)
+        private async Task LoadBlobAsync(
+            SourceData<BlobData> blobData,
+            ConcurrentQueue<SourceData<BufferFragment>> dataQueue)
         {
             var blobBuffer = await _buffer.ReserveSubBufferAsync((int)blobData.Data.BlobSize);
             var readOptions = new BlobOpenReadOptions(false)
@@ -70,11 +78,11 @@ namespace KustoPreForgeLib.Transforms
             }
             _journal.AddReading("DownloadBlob.BlobRead", 1);
 
-            return new SourceData<BufferFragment>(
+            dataQueue.Enqueue(new SourceData<BufferFragment>(
                 blobBuffer,
                 () => _journal.AddReading("DownloadBlob.BlobCommited", 1),
                 null,
-                blobData);
+                blobData));
         }
     }
 }
