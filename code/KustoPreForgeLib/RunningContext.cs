@@ -52,6 +52,9 @@ namespace KustoPreForgeLib
                         kustoSettings.IngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
+            var stagingContainers = kustoAdminIngestClient == null
+                ? (IImmutableList<BlobContainerClient>?)null
+                : await FetchIngestionStagingContainersAsync(kustoAdminIngestClient);
             var kustoAdminEngineClient =
                 await FetchEngineAdminClientAsync(kustoAdminIngestClient, credentials);
 
@@ -62,7 +65,8 @@ namespace KustoPreForgeLib
                 destinationBlobClient,
                 ingestClient,
                 ingestionPropertiesFactory,
-                kustoAdminEngineClient);
+                kustoAdminEngineClient,
+                stagingContainers);
         }
 
         public RunningContext(
@@ -72,7 +76,8 @@ namespace KustoPreForgeLib
             BlockBlobClient? destinationBlobClient,
             IKustoQueuedIngestClient? ingestClient,
             Func<KustoQueuedIngestionProperties>? ingestionPropertiesFactory,
-            ICslAdminProvider? adminEngineClient)
+            ICslAdminProvider? adminEngineClient,
+            IImmutableList<BlobContainerClient>? stagingContainers)
         {
             BlobSettings = blobSettings;
             Credentials = credentials;
@@ -81,6 +86,7 @@ namespace KustoPreForgeLib
             IngestClient = ingestClient;
             _ingestionPropertiesFactory = ingestionPropertiesFactory;
             AdminEngineClient = adminEngineClient;
+            StagingContainers = stagingContainers;
         }
 
         private static async Task<ICslAdminProvider?> FetchEngineAdminClientAsync(
@@ -114,8 +120,10 @@ namespace KustoPreForgeLib
         public BlockBlobClient? DestinationBlobClient { get; }
 
         public IKustoQueuedIngestClient? IngestClient { get; }
-        
+
         public ICslAdminProvider? AdminEngineClient { get; }
+        
+        public IImmutableList<BlobContainerClient>? StagingContainers { get; }
 
         public KustoQueuedIngestionProperties CreateIngestionProperties()
         {
@@ -127,39 +135,8 @@ namespace KustoPreForgeLib
             return _ingestionPropertiesFactory();
         }
 
-        //public BlobContainerClient RoundRobinIngestStagingContainer()
-        //{
-        //    if (_ingestionStagingContainers.Count == 0)
-        //    {
-        //        throw new InvalidDataException("No ingestion staging containers are detected");
-        //    }
-
-        //    var client = _ingestionStagingContainers[
-        //        _ingestionStagingContainerIndex % _ingestionStagingContainers.Count];
-
-        //    Interlocked.Increment(ref _ingestionStagingContainerIndex);
-
-        //    return client;
-        //}
-
-        public RunningContext OverrideSourceBlob(Uri sourceUri)
-        {
-            var sourceBlobClient = new BlockBlobClient(sourceUri, Credentials);
-
-            return new RunningContext(
-                BlobSettings,
-                Credentials,
-                sourceBlobClient,
-                DestinationBlobClient,
-                IngestClient,
-                _ingestionPropertiesFactory,
-                AdminEngineClient);
-            //,
-            //    _ingestionStagingContainers
-        }
-
-        public static async Task<ImmutableArray<BlobContainerClient>> GetIngestionStagingContainersAsync(
-            ICslAdminProvider kustoAdminClient)
+        private static async Task<ImmutableArray<BlobContainerClient>>
+            FetchIngestionStagingContainersAsync(ICslAdminProvider kustoAdminClient)
         {
             var dataReader = await kustoAdminClient.ExecuteControlCommandAsync(
                 string.Empty,

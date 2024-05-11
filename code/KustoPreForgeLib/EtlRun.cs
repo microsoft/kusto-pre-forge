@@ -133,6 +133,7 @@ namespace KustoPreForgeLib
                                 partitionConfig.Seed),
                             journal),
                         journal),
+                    context.StagingContainers!,
                     TimeSpan.FromMinutes(1),
                     journal));
         }
