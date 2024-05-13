@@ -21,6 +21,8 @@ namespace KustoPreForgeLib.Settings
         public Uri? DestinationBlobPrefix { get; }
 
         public BlobSettings BlobSettings { get; }
+
+        public string TempDirectory { get; }
         #endregion
 
         #region Constructors
@@ -45,6 +47,7 @@ namespace KustoPreForgeLib.Settings
             var outputCompression = GetEnum<DataSourceCompressionType>("OutputCompression", false);
             var hasHeaders = GetBool("CsvHeaders", false);
             var maxMbPerShard = GetInt("MaxMbPerShard", false);
+            var tempDirectory = GetString("TempDirectory", false);
 
             return new RunSettings(
                 eltAction,
@@ -68,7 +71,8 @@ namespace KustoPreForgeLib.Settings
                     inputCompression,
                     outputCompression,
                     hasHeaders,
-                    maxMbPerShard));
+                    maxMbPerShard),
+                tempDirectory);
         }
 
         public RunSettings(
@@ -79,7 +83,8 @@ namespace KustoPreForgeLib.Settings
             string? kustoDb,
             string? kustoTable,
             Uri? destinationBlobPrefix,
-            BlobSettings blobSettings)
+            BlobSettings blobSettings,
+            string? tempDirectory)
         {
             if (kustoIngestUri != null)
             {
@@ -104,6 +109,7 @@ namespace KustoPreForgeLib.Settings
                 kustoTable);
             DestinationBlobPrefix = destinationBlobPrefix;
             BlobSettings = blobSettings;
+            TempDirectory = tempDirectory ?? Path.GetTempPath();
         }
         #endregion
 
