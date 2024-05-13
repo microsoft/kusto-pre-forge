@@ -104,7 +104,10 @@ namespace KustoPreForgeLib.Memory
         /// <param name="interval">Interval to look within.</param>
         /// <param name="length">Length of memory to reserve.</param>
         /// <returns></returns>
-        public Task<MemoryInterval> ReserveWithinAsync(MemoryInterval interval, int length)
+        public Task<MemoryInterval> ReserveWithinAsync(
+            MemoryInterval interval,
+            int length,
+            CancellationToken ct = default(CancellationToken))
         {
             if (length < 1 || length > interval.Length)
             {
@@ -122,7 +125,7 @@ namespace KustoPreForgeLib.Memory
 
                     _preReservations.Add(new PreReservation(interval, length, source));
 
-                    return source.Task;
+                    return AwaitTaskWithCancellationAsync(source.Task, ct);
                 }
             }
         }
@@ -290,6 +293,17 @@ namespace KustoPreForgeLib.Memory
             }
 
             yield return new MemoryInterval(start, int.MaxValue - start);
+        }
+
+        private static async Task<MemoryInterval> AwaitTaskWithCancellationAsync(
+            Task<MemoryInterval> task,
+            CancellationToken ct)
+        {
+            await Task.WhenAll(task, Task.Delay(-1, ct));
+
+            ct.ThrowIfCancellationRequested();
+
+            return await task;
         }
     }
 }

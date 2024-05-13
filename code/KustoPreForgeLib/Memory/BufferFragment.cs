@@ -189,11 +189,14 @@ namespace KustoPreForgeLib.Memory
             return _memoryTracker.ReserveAsync(_bufferSubset.Interval);
         }
 
-        public async Task<BufferFragment> ReserveSubBufferAsync(int length)
+        public async Task<BufferFragment> ReserveSubBufferAsync(
+            int length,
+            CancellationToken ct = default(CancellationToken))
         {
             var reservedInterval = await _memoryTracker.ReserveWithinAsync(
                 _bufferSubset.Interval,
-                length);
+                length,
+                ct);
             var reservedSubset = new BufferSubset(_bufferSubset.Buffer, reservedInterval);
 
             return new BufferFragment(reservedSubset, _memoryTracker);
