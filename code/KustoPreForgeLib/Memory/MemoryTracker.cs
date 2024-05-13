@@ -123,13 +123,14 @@ namespace KustoPreForgeLib.Memory
             else
             {
                 var source = new TaskCompletionSource<MemoryInterval>();
+                var task = AwaitTaskWithCancellationAsync(source.Task, ct);
 
                 using (new TimeoutLock(_lock))
                 {
                     _preReservations.Add(new PreReservation(interval, length, source));
                 }
 
-                return AwaitTaskWithCancellationAsync(source.Task, ct);
+                return task;
             }
         }
         #endregion
@@ -321,7 +322,7 @@ namespace KustoPreForgeLib.Memory
             Task<MemoryInterval> task,
             CancellationToken ct)
         {
-            await Task.WhenAll(task, Task.Delay(-1, ct));
+            await Task.WhenAny(task, Task.Delay(-1, ct));
 
             ct.ThrowIfCancellationRequested();
 
