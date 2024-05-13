@@ -64,7 +64,7 @@ namespace KustoPreForgeLib.Transforms
         {
             var blobBuffer = await _buffer.ReserveSubBufferAsync(
                 (int)blobData.Data.BlobSize,
-                TransformHelper.CreateCancellationToken());
+                TransformHelper.CreateCancellationToken(TimeSpan.FromSeconds(20)));
             var readOptions = new BlobOpenReadOptions(false)
             {
                 BufferSize = blobBuffer.Length

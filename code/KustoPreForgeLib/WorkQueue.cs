@@ -18,10 +18,8 @@ namespace KustoPreForgeLib
     internal class WorkQueue
     {
         private readonly ConcurrentQueue<Func<Task>> _asyncFunctionQueue = new();
-        private readonly ConcurrentQueue<Task> _completedTasks = new();
-        private readonly ConcurrentQueue<int> _availableSlots = new();
-        private readonly List<Task> _workingTasks;
-        private readonly object _scheduleLock = new object();
+        private readonly ConcurrentQueue<Task> _runningTasks = new();
+        private volatile int _utilization = 0;
 
         public WorkQueue(int capacity)
         {
@@ -30,22 +28,15 @@ namespace KustoPreForgeLib
                 throw new ArgumentOutOfRangeException(nameof(capacity));
             }
             Capacity = capacity;
-            _workingTasks = new List<Task>(capacity);
-            //  Pre-populate
-            for (int i = 0; i < Capacity; i++)
-            {
-                _availableSlots.Enqueue(i);
-                _workingTasks.Add(Task.CompletedTask);
-            }
         }
 
         public int Capacity { get; }
 
-        public bool HasCapacity => _availableSlots.Any();
+        public bool HasCapacity => _utilization < Capacity;
 
-        public int UsedCapacity => _workingTasks.Count - _availableSlots.Count;
+        public int Utilization => _utilization;
 
-        public bool HasResults => _completedTasks.Any();
+        public bool HasResults => _runningTasks.Any();
 
         /// <summary>Queue a work item.</summary>
         /// <param name="asyncFunction"></param>
@@ -56,90 +47,106 @@ namespace KustoPreForgeLib
             TryScheduleFunction();
         }
 
-        /// <summary>Observe all completed tasks.</summary>>
+        #region Task management
+        /// <summary>Observe all completed tasks.</summary>
+        /// <remarks>
+        /// Methods <see cref="ObserveCompletedAsync"/>,
+        /// <see cref="WhenAnyAsync"/> and <see cref="WhenAllAsync"/>
+        /// should not be called in parallel.
+        /// </remarks>
         /// <returns></returns>
         public async Task ObserveCompletedAsync()
         {
-            while (_completedTasks.TryDequeue(out var task))
+            var incompletedTasks = new List<Task>(_runningTasks.Count);
+
+            while (_runningTasks.TryDequeue(out var task))
             {
-                await task;
+                if (task.IsCompleted)
+                {
+                    await task;
+                }
+                else
+                {
+                    incompletedTasks.Add(task);
+                }
+            }
+            //  Re-queue incompleted tasks
+            foreach (var task in incompletedTasks)
+            {
+                _runningTasks.Enqueue(task);
             }
         }
 
-        /// <summary>Awaits one task to be completed.</summary>>
+        /// <summary>Awaits one task to be completed.</summary>
         /// <returns>False iif no more work was enqueued when called.</returns>
-        public async Task<bool> WhenAnyAsync()
+        public async Task WhenAnyAsync()
         {
-            var isCapacityUsed = _availableSlots.Count < _workingTasks.Count;
+            var completedTasks = new List<Task>(_runningTasks.Count);
+            var incompletedTasks = new List<Task>(_runningTasks.Count);
 
-            if (_completedTasks.TryDequeue(out var task))
+            while (_runningTasks.TryDequeue(out var task))
             {
-                await task;
-
-                return true;
+                if (task.IsCompleted)
+                {
+                    completedTasks.Add(task);
+                }
+                else
+                {
+                    incompletedTasks.Add(task);
+                }
             }
-            else if (!isCapacityUsed)
+            try
             {
-                return false;
+                if (!completedTasks.Any() && !incompletedTasks.Any())
+                {
+                    throw new InvalidOperationException(
+                        "There are no unobserved tasks");
+                }
+                if (completedTasks.Any())
+                {
+                    return;
+                }
+                else
+                {
+                    await Task.WhenAny(incompletedTasks);
+                }
             }
-            else
+            finally
             {
-                await Task.Delay(TimeSpan.FromSeconds(0.1));
-
-                return await WhenAnyAsync();
+                //  Re-queue all tasks
+                foreach (var task in completedTasks.Concat(incompletedTasks))
+                {
+                    _runningTasks.Enqueue(task);
+                }
             }
         }
 
         public async Task WhenAllAsync()
         {
-            await ObserveCompletedAsync();
-            while (await WhenAnyAsync())
+            while (_runningTasks.TryDequeue(out var task))
             {
+                await task;
             }
         }
+        #endregion
 
         private void TryScheduleFunction()
         {
-            if (TryGettingReadyPair(out var availableSlot, out var asyncFunction))
+            if (Interlocked.Increment(ref _utilization) <= Capacity
+                && _asyncFunctionQueue.TryDequeue(out var asyncFunction))
             {
-                _workingTasks[availableSlot] =
-                    ExecuteTaskAsync(availableSlot, asyncFunction);
+                var task = ExecuteTaskAsync(asyncFunction);
+
+                return;
             }
+
+            Interlocked.Decrement(ref _utilization);
         }
 
-        private bool TryGettingReadyPair(
-            [MaybeNullWhen(false)] out int availableSlot,
-            [MaybeNullWhen(false)] out Func<Task> asyncFunction)
-        {
-            lock (_scheduleLock)
-            {
-                if (_availableSlots.TryDequeue(out var slot))
-                {
-                    if (_asyncFunctionQueue.TryDequeue(out var function))
-                    {
-                        availableSlot = slot;
-                        asyncFunction = function;
-
-                        return true;
-                    }
-                    else
-                    {
-                        _availableSlots.Enqueue(slot);
-                    }
-                }
-
-                availableSlot = default;
-                asyncFunction = default;
-
-                return false;
-            }
-        }
-
-        private async Task ExecuteTaskAsync(int slot, Func<Task> asyncFunction)
+        private async Task ExecuteTaskAsync(Func<Task> asyncFunction)
         {
             await asyncFunction();
-            _completedTasks.Enqueue(_workingTasks[slot]);
-            _availableSlots.Enqueue(slot);
+            Interlocked.Decrement(ref _utilization);
             TryScheduleFunction();
         }
     }
