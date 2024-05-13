@@ -26,7 +26,7 @@ namespace KustoPreForgeLib.Memory
 
         public override string ToString()
         {
-            return $"Offset:  {Offset}, Length:  {Length}";
+            return $"Offset:  {Offset:#,##0}, Length:  {Length:#,##0}";
         }
     }
 }

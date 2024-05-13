@@ -113,20 +113,20 @@ namespace KustoPreForgeLib.Memory
             {
                 throw new ArgumentOutOfRangeException(nameof(length));
             }
-            lock (_lock)
+            if (InternalTryReserveWithin(interval, length, out var outputInterval))
             {
-                if (InternalTryReserveWithin(interval, length, out var outputInterval))
-                {
-                    return Task.FromResult(outputInterval);
-                }
-                else
-                {
-                    var source = new TaskCompletionSource<MemoryInterval>();
+                return Task.FromResult(outputInterval);
+            }
+            else
+            {
+                var source = new TaskCompletionSource<MemoryInterval>();
 
+                lock (_lock)
+                {
                     _preReservations.Add(new PreReservation(interval, length, source));
-
-                    return AwaitTaskWithCancellationAsync(source.Task, ct);
                 }
+
+                return AwaitTaskWithCancellationAsync(source.Task, ct);
             }
         }
         #endregion
@@ -259,22 +259,25 @@ namespace KustoPreForgeLib.Memory
             int length,
             out MemoryInterval outputInterval)
         {
-            foreach (var availableInterval in EnumerateAvailableIntervals())
+            lock (_lock)
             {
-                var clippedAvailableInterval = availableInterval.Intersect(interval);
-
-                if (clippedAvailableInterval.Length >= length)
+                foreach (var availableInterval in EnumerateAvailableIntervals())
                 {
-                    outputInterval = new MemoryInterval(clippedAvailableInterval.Offset, length);
-                    Reserve(outputInterval);
+                    var clippedAvailableInterval = availableInterval.Intersect(interval);
 
-                    return true;
+                    if (clippedAvailableInterval.Length >= length)
+                    {
+                        outputInterval = new MemoryInterval(clippedAvailableInterval.Offset, length);
+                        Reserve(outputInterval);
+
+                        return true;
+                    }
                 }
+
+                outputInterval = new MemoryInterval();
+
+                return false;
             }
-
-            outputInterval = new MemoryInterval();
-
-            return false;
         }
 
         /// <summary>This gives the inverse of reservations into the available intervals.</summary>
