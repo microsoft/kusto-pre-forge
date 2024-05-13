@@ -27,24 +27,27 @@ namespace KustoPreForgeLib.Memory
             MemoryInterval interval,
             int? length,
             TaskCompletionSource<MemoryInterval> source);
+
+        private class TimeoutLock : IDisposable
+        {
+            private readonly object _lockObject;
+
+            public TimeoutLock(object lockObject)
+            {
+                _lockObject = lockObject;
+                Monitor.TryEnter(lockObject, TimeSpan.FromSeconds(5));
+            }
+
+            void IDisposable.Dispose()
+            {
+                Monitor.Exit(_lockObject);
+            }
+        }
         #endregion
 
         private readonly object _lock = new();
         private readonly List<MemoryInterval> _reservedIntervals = new();
         private readonly List<PreReservation> _preReservations = new();
-
-        public bool IsAvailable(MemoryInterval interval)
-        {
-            foreach (var block in _reservedIntervals)
-            {
-                if (block.HasOverlap(interval))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
 
         #region Reservation
         public void Reserve(MemoryInterval interval)
@@ -58,7 +61,7 @@ namespace KustoPreForgeLib.Memory
                 return;
             }
 
-            lock (_lock)
+            using (new TimeoutLock(_lock))
             {
                 var index =
                     _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
@@ -83,7 +86,7 @@ namespace KustoPreForgeLib.Memory
 
         public Task ReserveAsync(MemoryInterval interval)
         {
-            lock (_lock)
+            using (new TimeoutLock(_lock))
             {
                 if (IsAvailable(interval))
                 {
@@ -121,7 +124,7 @@ namespace KustoPreForgeLib.Memory
             {
                 var source = new TaskCompletionSource<MemoryInterval>();
 
-                lock (_lock)
+                using (new TimeoutLock(_lock))
                 {
                     _preReservations.Add(new PreReservation(interval, length, source));
                 }
@@ -141,7 +144,7 @@ namespace KustoPreForgeLib.Memory
             {
                 return;
             }
-            lock (_lock)
+            using (new TimeoutLock(_lock))
             {
                 var index =
                     _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
@@ -196,9 +199,25 @@ namespace KustoPreForgeLib.Memory
             }
         }
 
+        private bool IsAvailable(MemoryInterval interval)
+        {
+            using (new TimeoutLock(_lock))
+            {
+                foreach (var block in _reservedIntervals)
+                {
+                    if (block.HasOverlap(interval))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        }
+
         private void RaiseTracking()
         {
-            lock (_lock)
+            using (new TimeoutLock(_lock))
             {
                 var preReservationsCopy = _preReservations.ToImmutableArray();
 
@@ -259,7 +278,7 @@ namespace KustoPreForgeLib.Memory
             int length,
             out MemoryInterval outputInterval)
         {
-            lock (_lock)
+            using (new TimeoutLock(_lock))
             {
                 foreach (var availableInterval in EnumerateAvailableIntervals())
                 {
