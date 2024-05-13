@@ -144,6 +144,8 @@ namespace KustoPreForgeLib
             {
                 var task = ExecuteTaskAsync(asyncFunction);
 
+                _runningTasks.Enqueue(task);
+
                 return;
             }
 
