@@ -99,8 +99,15 @@ namespace KustoPreForgeLib
             {
                 if (!completedTasks.Any() && !incompletedTasks.Any())
                 {
-                    throw new InvalidOperationException(
-                        "There are no unobserved tasks");
+                    if (_utilization > 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"No unobserved tasks while utilization is at {_utilization}");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("There are no unobserved tasks");
+                    }
                 }
                 if (completedTasks.Any())
                 {
@@ -140,7 +147,10 @@ namespace KustoPreForgeLib
                 return;
             }
 
-            Interlocked.Decrement(ref _utilization);
+            if (Interlocked.Decrement(ref _utilization) < Capacity)
+            {
+                TryScheduleFunction();
+            }
         }
 
         private async Task ExecuteTaskAsync(Func<Task> asyncFunction)
