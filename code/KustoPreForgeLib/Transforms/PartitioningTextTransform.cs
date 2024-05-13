@@ -38,8 +38,9 @@ namespace KustoPreForgeLib.Transforms
 
                 foreach (var partitionId in partitionSizes.Keys)
                 {
-                    var subBuffer =
-                        await _buffer.ReserveSubBufferAsync(partitionSizes[partitionId] + 1);
+                    var subBuffer = await _buffer.ReserveSubBufferAsync(
+                        partitionSizes[partitionId] + 1,
+                        TransformHelper.CreateCancellationToken());
                     var subBufferMemory = subBuffer.ToMemory();
                     var output = new SinglePartitionContent(
                         subBuffer,

@@ -27,7 +27,9 @@ namespace KustoPreForgeLib.Transforms
             {
                 var inputBuffer = data.Data;
                 var uncompressedSize = ComputeUncompressedSize(inputBuffer);
-                var outputBuffer = await _buffer.ReserveSubBufferAsync(uncompressedSize);
+                var outputBuffer = await _buffer.ReserveSubBufferAsync(
+                    uncompressedSize,
+                    TransformHelper.CreateCancellationToken());
 
                 UncompressContent(inputBuffer, outputBuffer);
                 inputBuffer.Release();

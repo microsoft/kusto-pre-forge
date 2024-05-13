@@ -62,7 +62,9 @@ namespace KustoPreForgeLib.Transforms
             SourceData<BlobData> blobData,
             ConcurrentQueue<SourceData<BufferFragment>> dataQueue)
         {
-            var blobBuffer = await _buffer.ReserveSubBufferAsync((int)blobData.Data.BlobSize);
+            var blobBuffer = await _buffer.ReserveSubBufferAsync(
+                (int)blobData.Data.BlobSize,
+                TransformHelper.CreateCancellationToken());
             var readOptions = new BlobOpenReadOptions(false)
             {
                 BufferSize = blobBuffer.Length
