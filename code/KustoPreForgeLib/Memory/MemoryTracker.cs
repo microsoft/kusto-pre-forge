@@ -27,22 +27,6 @@ namespace KustoPreForgeLib.Memory
             MemoryInterval interval,
             int? length,
             TaskCompletionSource<MemoryInterval> source);
-
-        private class TimeoutLock : IDisposable
-        {
-            private readonly object _lockObject;
-
-            public TimeoutLock(object lockObject)
-            {
-                _lockObject = lockObject;
-                Monitor.TryEnter(lockObject, TimeSpan.FromSeconds(5));
-            }
-
-            void IDisposable.Dispose()
-            {
-                Monitor.Exit(_lockObject);
-            }
-        }
         #endregion
 
         private readonly object _lock = new();
@@ -61,7 +45,7 @@ namespace KustoPreForgeLib.Memory
                 return;
             }
 
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 var index =
                     _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
@@ -86,7 +70,7 @@ namespace KustoPreForgeLib.Memory
 
         public Task ReserveAsync(MemoryInterval interval)
         {
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 if (IsAvailable(interval))
                 {
@@ -125,7 +109,7 @@ namespace KustoPreForgeLib.Memory
                 var source = new TaskCompletionSource<MemoryInterval>();
                 var task = AwaitTaskWithCancellationAsync(source.Task, ct);
 
-                using (new TimeoutLock(_lock))
+                lock (_lock)
                 {
                     _preReservations.Add(new PreReservation(interval, length, source));
                 }
@@ -145,7 +129,7 @@ namespace KustoPreForgeLib.Memory
             {
                 return;
             }
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 var index =
                     _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
@@ -202,7 +186,7 @@ namespace KustoPreForgeLib.Memory
 
         private bool IsAvailable(MemoryInterval interval)
         {
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 foreach (var block in _reservedIntervals)
                 {
@@ -218,7 +202,7 @@ namespace KustoPreForgeLib.Memory
 
         private void RaiseTracking()
         {
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 var preReservationsCopy = _preReservations.ToImmutableArray();
 
@@ -279,7 +263,7 @@ namespace KustoPreForgeLib.Memory
             int length,
             out MemoryInterval outputInterval)
         {
-            using (new TimeoutLock(_lock))
+            lock (_lock)
             {
                 foreach (var availableInterval in EnumerateAvailableIntervals())
                 {
