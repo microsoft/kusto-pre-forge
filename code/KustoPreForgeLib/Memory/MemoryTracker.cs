@@ -113,7 +113,7 @@ namespace KustoPreForgeLib.Memory
             {
                 throw new ArgumentOutOfRangeException(nameof(length));
             }
-            if (InternalTryReserveWithin(interval, length, out var outputInterval))
+            if (TryReserveWithin(interval, length, out var outputInterval))
             {
                 return Task.FromResult(outputInterval);
             }
@@ -218,7 +218,7 @@ namespace KustoPreForgeLib.Memory
                     }
                     else
                     {
-                        if (InternalTryReserveWithin(
+                        if (TryReserveWithin(
                             preReservation.interval,
                             preReservation.length.Value,
                             out var outputInterval))
@@ -254,7 +254,7 @@ namespace KustoPreForgeLib.Memory
             }
         }
 
-        private bool InternalTryReserveWithin(
+        private bool TryReserveWithin(
             MemoryInterval interval,
             int length,
             out MemoryInterval outputInterval)
