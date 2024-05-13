@@ -2,9 +2,12 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace KustoPreForgeLib
 {
@@ -97,20 +100,38 @@ namespace KustoPreForgeLib
 
         private void TryScheduleFunction()
         {
+            if (TryGettingReadyPair(out var availableSlot, out var asyncFunction))
+            {
+                _workingTasks[availableSlot] =
+                    ExecuteTaskAsync(availableSlot, asyncFunction);
+            }
+        }
+
+        private bool TryGettingReadyPair(
+            [MaybeNullWhen(false)] out int availableSlot,
+            [MaybeNullWhen(false)] out Func<Task> asyncFunction)
+        {
             lock (_scheduleLock)
             {
-                if (_availableSlots.TryDequeue(out var availableSlot))
+                if (_availableSlots.TryDequeue(out var slot))
                 {
-                    if (_asyncFunctionQueue.TryDequeue(out var asyncFunction))
+                    if (_asyncFunctionQueue.TryDequeue(out var function))
                     {
-                        _workingTasks[availableSlot] =
-                            ExecuteTaskAsync(availableSlot, asyncFunction);
+                        availableSlot = slot;
+                        asyncFunction = function;
+
+                        return true;
                     }
                     else
                     {
-                        _availableSlots.Enqueue(availableSlot);
+                        _availableSlots.Enqueue(slot);
                     }
                 }
+
+                availableSlot = default;
+                asyncFunction = default;
+
+                return false;
             }
         }
 

@@ -10,7 +10,7 @@ namespace KustoPreForgeLib.Transforms
     {
         public static CancellationToken CreateCancellationToken(TimeSpan? delay = null)
         {
-            var source = new CancellationTokenSource(delay ?? TimeSpan.FromSeconds(5));
+            var source = new CancellationTokenSource(delay ?? TimeSpan.FromSeconds(100));
 
             return source.Token;
         }

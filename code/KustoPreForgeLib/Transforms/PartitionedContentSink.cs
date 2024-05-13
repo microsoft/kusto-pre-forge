@@ -161,6 +161,9 @@ namespace KustoPreForgeLib.Transforms
                     intervalStart = DateTime.Now;
                 }
                 writer.Push(data.Data);
+                if (!workQueue.HasCapacity)
+                {
+                }
                 await workQueue.ObserveCompletedAsync();
             }
             writer.Flush();
