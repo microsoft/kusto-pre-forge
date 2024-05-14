@@ -32,6 +32,7 @@ namespace KustoPreForgeLib.Transforms
                 new Dictionary<int, PartitionContext>();
             private readonly List<IAsyncDisposable> _sourceDataList = new();
             private int _stagingContainerIndex = 0;
+            private volatile int _disposeCountDown;
 
             public PartitionsWriter(
                 WorkQueue workQueue,
@@ -77,8 +78,9 @@ namespace KustoPreForgeLib.Transforms
                     writeCompletion));
             }
 
-            public async void Flush()
+            public void Flush()
             {
+                _disposeCountDown = _partitionContextMap.Count;
                 foreach (var context in _partitionContextMap.Values)
                 {
                     //  Avoid capture of variable
@@ -86,8 +88,6 @@ namespace KustoPreForgeLib.Transforms
 
                     _workQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
                 }
-                //  Commit all sources
-                await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
             }
 
             private static string GetBlockId(int blockIndex)
@@ -123,6 +123,12 @@ namespace KustoPreForgeLib.Transforms
                     .Select(index => GetBlockId(index));
 
                 await partitionContext.Blob.CommitBlockListAsync(blockIds);
+
+                if (Interlocked.Decrement(ref _disposeCountDown) == 0)
+                {   //  Last one turn the switches off
+                    //  Commit all sources
+                    await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
+                }
             }
         }
         #endregion
