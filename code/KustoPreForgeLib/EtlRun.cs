@@ -29,16 +29,15 @@ namespace KustoPreForgeLib
         public static async Task RunEtlAsync(
             RunSettings runSettings,
             IDataSource<BlobData> blobSource,
-            RunningContext context)
+            RunningContext context,
+            PerfCounterJournal journal)
         {
             var stopwatch = new Stopwatch();
 
             stopwatch.Start();
 
-            var journal = new PerfCounterJournal();
             var etl = await CreateEtlAsync(runSettings, blobSource, context, journal);
 
-            journal.StartReporting();
             await etl.ProcessAsync();
             await journal.StopReportingAsync();
 

@@ -11,7 +11,8 @@ namespace KustoPreForgeLib.BlobSources
     {
         public static IDataSource<BlobData> Create(
             RunningContext runningContext,
-            SourceSettings sourceSettings)
+            SourceSettings sourceSettings,
+            PerfCounterJournal journal)
         {
             if (sourceSettings.SourceBlob != null)
             {
@@ -26,7 +27,8 @@ namespace KustoPreForgeLib.BlobSources
                 return new ListBlobSource(
                     sourceSettings.SourceBlobsPrefix,
                     sourceSettings.SourceBlobsSuffix,
-                    runningContext.Credentials);
+                    runningContext.Credentials,
+                    journal);
             }
             else
             {

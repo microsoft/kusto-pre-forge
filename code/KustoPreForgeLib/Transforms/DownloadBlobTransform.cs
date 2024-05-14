@@ -100,7 +100,7 @@ namespace KustoPreForgeLib.Transforms
 
             dataQueue.Enqueue(new SourceData<BufferFragment>(
                 blobBuffer,
-                () => _journal.AddReading("DownloadBlob.BlobCommited", 1),
+                null,
                 null,
                 blobData));
         }
