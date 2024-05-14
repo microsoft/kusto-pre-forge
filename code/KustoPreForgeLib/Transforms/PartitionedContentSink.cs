@@ -30,6 +30,7 @@ namespace KustoPreForgeLib.Transforms
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
             private readonly IDictionary<int, PartitionContext> _partitionContextMap =
                 new Dictionary<int, PartitionContext>();
+            private readonly List<IAsyncDisposable> _sourceDataList = new();
             private int _stagingContainerIndex = 0;
 
             public PartitionsWriter(
@@ -42,8 +43,11 @@ namespace KustoPreForgeLib.Transforms
                 _stagingContainers = stagingContainers;
             }
 
-            public void Push(SinglePartitionContent content)
+            public void Push(SourceData<SinglePartitionContent> data)
             {
+                var content = data.Data;
+
+                _sourceDataList.Add(data);
                 if (!_partitionContextMap.ContainsKey(content.PartitionId))
                 {
                     var container = _stagingContainers[_stagingContainerIndex];
@@ -73,7 +77,7 @@ namespace KustoPreForgeLib.Transforms
                     writeCompletion));
             }
 
-            public void Flush()
+            public async void Flush()
             {
                 foreach (var context in _partitionContextMap.Values)
                 {
@@ -82,6 +86,8 @@ namespace KustoPreForgeLib.Transforms
 
                     _workQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
                 }
+                //  Commit all sources
+                await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
             }
 
             private static string GetBlockId(int blockIndex)
@@ -160,7 +166,7 @@ namespace KustoPreForgeLib.Transforms
                     writer = writerFactory();
                     intervalStart = DateTime.Now;
                 }
-                writer.Push(data.Data);
+                writer.Push(data);
                 if (!workQueue.HasCapacity)
                 {
                 }
