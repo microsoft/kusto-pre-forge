@@ -31,20 +31,16 @@ namespace KustoPreForgeConsole
 
                 var runSettings = RunSettings.FromEnvironmentVariables();
                 var context = await RunningContext.CreateAsync(runSettings);
-                var blobSource = BlobSourceFactory.Create(context, runSettings.SourceSettings);
+                var journal = new PerfCounterJournal();
+                var blobSource = BlobSourceFactory.Create(
+                    context,
+                    runSettings.SourceSettings,
+                    journal);
 
+                journal.StartReporting();
                 runSettings.WriteOutSettings();
-                if (string.IsNullOrWhiteSpace(runSettings.SourceSettings.ServiceBusQueueUrl))
-                {   //  Run one ETL
-                    await EtlRun.RunEtlAsync(runSettings, blobSource, context);
-                }
-                else
-                {   //  Run Service Bus server picking up tasks
-                    //await ServiceBusServer.RunServerAsync(
-                    //    runSettings.SourceSettings.ServiceBusQueueUrl,
-                    //    context);
-                    throw new NotSupportedException();
-                }
+                //  Run one ETL
+                await EtlRun.RunEtlAsync(runSettings, blobSource, context, journal);
             }
             catch (Exception ex)
             {

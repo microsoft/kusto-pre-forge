@@ -8,11 +8,13 @@ namespace KustoPreForgeLib.BlobSources
         private readonly BlobContainerClient _blobContainerClient;
         private readonly string _prefix;
         private readonly string? _suffix;
+        private readonly PerfCounterJournal _journal;
 
         public ListBlobSource(
             Uri sourceBlobsPrefix,
             string? sourceBlobsSuffix,
-            TokenCredential credentials)
+            TokenCredential credentials,
+            PerfCounterJournal journal)
         {
             var prefixBuilder = new UriBuilder(sourceBlobsPrefix);
 
@@ -20,6 +22,7 @@ namespace KustoPreForgeLib.BlobSources
             _blobContainerClient = new BlobContainerClient(prefixBuilder.Uri, credentials);
             _prefix = string.Join(string.Empty, sourceBlobsPrefix.Segments.Skip(2));
             _suffix = sourceBlobsSuffix;
+            _journal = journal;
         }
 
         #region IAsyncEnumerable<SourceData<BlobData>>
@@ -35,7 +38,7 @@ namespace KustoPreForgeLib.BlobSources
                         new BlobData(
                             _blobContainerClient.GetBlobClient(item.Name),
                             item.Properties.ContentLength ?? 0),
-                        null,
+                        () => _journal.AddReading("ListBlob.BlobCommited", 1),
                         null);
                 }
             }
