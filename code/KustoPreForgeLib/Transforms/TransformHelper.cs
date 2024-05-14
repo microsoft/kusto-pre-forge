@@ -11,7 +11,7 @@ namespace KustoPreForgeLib.Transforms
         public static CancellationToken CreateCancellationToken(TimeSpan? delay = null)
         {
 #if DEBUG
-            var source = new CancellationTokenSource(delay ?? TimeSpan.FromSeconds(30));
+            var source = new CancellationTokenSource(delay ?? TimeSpan.FromSeconds(40));
 #else
             var source = new CancellationTokenSource(delay ?? TimeSpan.FromSeconds(10));
 #endif
