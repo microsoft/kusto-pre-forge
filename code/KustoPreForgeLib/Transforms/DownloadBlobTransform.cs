@@ -54,8 +54,11 @@ namespace KustoPreForgeLib.Transforms
                             Task.WhenAll(workQueue.WhenAnyAsync(), blobBufferTask));
                     }
                 }
+
+                var blobBuffer = await blobBufferTask;
+
                 await workQueue.ObserveCompletedAsync();
-                workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, dataQueue));
+                workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, blobBuffer, dataQueue));
             }
             await workQueue.WhenAllAsync();
             while (dataQueue.TryDequeue(out var contentData))
@@ -66,6 +69,7 @@ namespace KustoPreForgeLib.Transforms
 
         private async Task LoadBlobAsync(
             SourceData<BlobData> blobData,
+            BufferFragment blobBuffer,
             ConcurrentQueue<SourceData<BufferFragment>> dataQueue)
         {
             var readOptions = new BlobOpenReadOptions(false)
