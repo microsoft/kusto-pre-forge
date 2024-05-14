@@ -1,6 +1,9 @@
-﻿using System;
+﻿using Azure.Storage.Sas;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,8 +11,13 @@ using System.Threading.Tasks;
 namespace KustoPreForgeLib.Memory
 {
     /// <summary>
-    /// Tracker of memory blocks.  Keep no memory block itself.
+    /// Tracker of memory blocks.  Doesn't hold memory buffer itself.
     /// </summary>
+    /// <remarks>
+    /// Implementation is based on optimistic concurrency.  There are no locks (as we
+    /// had deadlock issues before).  Instead an internal state keeps a readonly state
+    /// which is managed by transitionning from state to state in an atomic way.
+    /// </remarks>
     internal class MemoryTracker
     {
         #region Inner Types
@@ -28,139 +36,104 @@ namespace KustoPreForgeLib.Memory
             int? length,
             TaskCompletionSource<MemoryInterval> source);
 
-        private class TimeoutLock : IDisposable
+        private record InternalState(
+            ImmutableArray<MemoryInterval> ReservedIntervals,
+            ImmutableArray<PreReservation> PreReservations)
         {
-            private readonly object _lockObject;
-
-            public TimeoutLock(object lockObject)
+            public InternalState? TryReserve(MemoryInterval interval)
             {
-                _lockObject = lockObject;
-                Monitor.TryEnter(lockObject, TimeSpan.FromSeconds(5));
-            }
+                if (interval.Length < 0 || interval.Offset < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(interval));
+                }
+                if (interval.Length == 0)
+                {
+                    return this;
+                }
 
-            void IDisposable.Dispose()
-            {
-                Monitor.Exit(_lockObject);
-            }
-        }
-        #endregion
-
-        private readonly object _lock = new();
-        private readonly List<MemoryInterval> _reservedIntervals = new();
-        private readonly List<PreReservation> _preReservations = new();
-
-        #region Reservation
-        public void Reserve(MemoryInterval interval)
-        {
-            if (interval.Length < 0 || interval.Offset < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(interval));
-            }
-            if (interval.Length == 0)
-            {
-                return;
-            }
-
-            using (new TimeoutLock(_lock))
-            {
-                var index =
-                    _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
+                var index = ReservedIntervals.BinarySearch(
+                    interval,
+                    MemoryBlockComparer.Singleton);
 
                 if (!IsAvailable(interval))
                 {
-                    throw new InvalidOperationException("Interval isn't available to reserve");
+                    return null;
                 }
-                if (index >= 0)
+                else if (index >= 0)
                 {   //  This should never be triggered
-                    throw new InvalidOperationException("Existing block:  can't be reserved twice");
+                    throw new InvalidOperationException(
+                        "Existing block:  can't be reserved twice");
                 }
                 else
                 {
                     var newIndex = ~index;
 
-                    _reservedIntervals.Insert(newIndex, interval);
-                    DoMerge(newIndex);
+                    return AddIntervalAndMerge(newIndex, interval);
                 }
             }
-        }
 
-        public Task ReserveAsync(MemoryInterval interval)
-        {
-            using (new TimeoutLock(_lock))
+            public InternalState? TryReserveWithin(
+                MemoryInterval interval,
+                int length,
+                out MemoryInterval outputSubInterval)
             {
-                if (IsAvailable(interval))
+                if (length < 1 || length > interval.Length)
                 {
-                    return Task.CompletedTask;
+                    throw new ArgumentOutOfRangeException(nameof(length));
+                }
+
+                var subInterval = TryFindFreeIntervalWithin(interval, length);
+
+                if (subInterval != null)
+                {
+                    var finalState = TryReserve(subInterval.Value);
+
+                    outputSubInterval = finalState != null
+                        ? subInterval.Value
+                        : default(MemoryInterval);
+
+                    return finalState;
                 }
                 else
                 {
-                    var source = new TaskCompletionSource<MemoryInterval>();
+                    outputSubInterval = default(MemoryInterval);
 
-                    _preReservations.Add(new PreReservation(interval, null, source));
-
-                    return source.Task;
+                    return null;
                 }
             }
-        }
 
-        /// <summary>Reserves a length of memory within an interval.</summary>>
-        /// <param name="interval">Interval to look within.</param>
-        /// <param name="length">Length of memory to reserve.</param>
-        /// <returns></returns>
-        public Task<MemoryInterval> ReserveWithinAsync(
-            MemoryInterval interval,
-            int length,
-            CancellationToken ct = default(CancellationToken))
-        {
-            if (length < 1 || length > interval.Length)
+            public InternalState Release(MemoryInterval interval)
             {
-                throw new ArgumentOutOfRangeException(nameof(length));
-            }
-            if (TryReserveWithin(interval, length, out var outputInterval))
-            {
-                return Task.FromResult(outputInterval);
-            }
-            else
-            {
-                var source = new TaskCompletionSource<MemoryInterval>();
-                var task = AwaitTaskWithCancellationAsync(source.Task, ct);
-
-                using (new TimeoutLock(_lock))
+                if (interval.Length < 0 || interval.Offset < 0)
                 {
-                    _preReservations.Add(new PreReservation(interval, length, source));
+                    throw new ArgumentOutOfRangeException(nameof(interval));
+                }
+                if (interval.Length == 0)
+                {
+                    return this;
                 }
 
-                return task;
-            }
-        }
-        #endregion
-
-        public void Release(MemoryInterval interval)
-        {
-            if (interval.Length < 0 || interval.Offset < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(interval));
-            }
-            if (interval.Length == 0)
-            {
-                return;
-            }
-            using (new TimeoutLock(_lock))
-            {
-                var index =
-                    _reservedIntervals.BinarySearch(interval, MemoryBlockComparer.Singleton);
+                var index = ReservedIntervals.BinarySearch(
+                    interval,
+                    MemoryBlockComparer.Singleton);
 
                 if (index >= 0)
                 {   //  The offset match a block
-                    if (_reservedIntervals[index].Length == interval.Length)
+                    if (ReservedIntervals[index].Length == interval.Length)
                     {   //  Exact match
-                        _reservedIntervals.RemoveAt(index);
+                        return new InternalState(
+                            ReservedIntervals.RemoveAt(index),
+                            PreReservations);
                     }
-                    else if (_reservedIntervals[index].Length > interval.Length)
+                    else if (ReservedIntervals[index].Length > interval.Length)
                     {   //  Existing block is bigger than release one
-                        _reservedIntervals[index] = new MemoryInterval(
+                        var builder = ReservedIntervals.ToBuilder();
+
+                        builder[index] = new MemoryInterval(
                             interval.End,
-                            _reservedIntervals[index].Length - interval.Length);
+                            ReservedIntervals[index].Length - interval.Length);
+
+                        return new InternalState(builder.ToImmutable(), PreReservations);
                     }
                     else
                     {   //  Existing block is smaller than release one:  doesn't work
@@ -175,20 +148,25 @@ namespace KustoPreForgeLib.Memory
                     }
                     else
                     {
-                        if (_reservedIntervals[~index - 1].End > interval.Offset
-                            && _reservedIntervals[~index - 1].End >= interval.End)
+                        if (ReservedIntervals[~index - 1].End > interval.Offset
+                            && ReservedIntervals[~index - 1].End >= interval.End)
                         {
                             var before = new MemoryInterval(
-                                _reservedIntervals[~index - 1].Offset,
-                                interval.Offset - _reservedIntervals[~index - 1].Offset);
+                                ReservedIntervals[~index - 1].Offset,
+                                interval.Offset - ReservedIntervals[~index - 1].Offset);
                             var after = new MemoryInterval(
                                 interval.End,
-                                _reservedIntervals[~index - 1].End - interval.End);
+                                ReservedIntervals[~index - 1].End - interval.End);
                             var validBlocks = new[] { before, after }
                             .Where(b => b.Length > 0);
+                            var builder = ReservedIntervals.ToBuilder();
 
-                            _reservedIntervals.RemoveAt(~index - 1);
-                            _reservedIntervals.InsertRange(~index - 1, validBlocks);
+                            builder.RemoveAt(~index - 1);
+                            builder.InsertRange(~index - 1, validBlocks);
+
+                            return new InternalState(
+                                builder.ToImmutable(),
+                                PreReservations);
                         }
                         else
                         {
@@ -196,15 +174,11 @@ namespace KustoPreForgeLib.Memory
                         }
                     }
                 }
-                RaiseTracking();
             }
-        }
 
-        private bool IsAvailable(MemoryInterval interval)
-        {
-            using (new TimeoutLock(_lock))
+            private bool IsAvailable(MemoryInterval interval)
             {
-                foreach (var block in _reservedIntervals)
+                foreach (var block in ReservedIntervals)
                 {
                     if (block.HasOverlap(interval))
                     {
@@ -214,72 +188,34 @@ namespace KustoPreForgeLib.Memory
 
                 return true;
             }
-        }
 
-        private void RaiseTracking()
-        {
-            using (new TimeoutLock(_lock))
+            private InternalState AddIntervalAndMerge(int newIndex, MemoryInterval newInterval)
             {
-                var preReservationsCopy = _preReservations.ToImmutableArray();
+                var builder = ReservedIntervals.ToBuilder();
 
-                _preReservations.Clear();
-                foreach (var preReservation in preReservationsCopy)
-                {
-                    if (preReservation.length == null)
-                    {
-                        if (IsAvailable(preReservation.interval))
-                        {
-                            preReservation.source.SetResult(preReservation.interval);
-                        }
-                        else
-                        {
-                            _preReservations.Add(preReservation);
-                        }
-                    }
-                    else
-                    {
-                        if (TryReserveWithin(
-                            preReservation.interval,
-                            preReservation.length.Value,
-                            out var outputInterval))
-                        {
-                            preReservation.source.SetResult(outputInterval);
-                        }
-                    }
+                if (ReservedIntervals.Length > newIndex
+                    && ReservedIntervals[newIndex].Offset == newInterval.End)
+                {   //  New interval's end is an old interval's beginning, let's merge
+                    newInterval = new MemoryInterval(
+                        newInterval.Offset,
+                        newInterval.Length + ReservedIntervals[newIndex].Length);
+                    builder.RemoveAt(newIndex);
                 }
-            }
-        }
+                if (newIndex > 0
+                    && ReservedIntervals[newIndex - 1].End == newInterval.Offset)
+                {   //  New interval's beginning is an old interval's end, let's merge
+                    newInterval = new MemoryInterval(
+                        ReservedIntervals[newIndex - 1].Offset,
+                        newInterval.Length + ReservedIntervals[newIndex - 1].Length);
+                    builder.RemoveAt(newIndex - 1);
+                    --newIndex;
+                }
+                builder.Insert(newIndex, newInterval);
 
-        private void DoMerge(int newIndex)
-        {
-            var newBlock = _reservedIntervals[newIndex];
-
-            if (_reservedIntervals.Count > newIndex + 1
-                && _reservedIntervals[newIndex + 1].Offset == newBlock.End)
-            {   //  There is a block right after, let's merge
-                newBlock = new MemoryInterval(
-                    newBlock.Offset,
-                    newBlock.Length + _reservedIntervals[newIndex + 1].Length);
-                _reservedIntervals.RemoveRange(newIndex, 2);
-                _reservedIntervals.Insert(newIndex, newBlock);
+                return new InternalState(builder.ToImmutableArray(), PreReservations);
             }
-            if (newIndex > 0
-                && _reservedIntervals[newIndex - 1].End == newBlock.Offset)
-            {   //  There is a block right before, let's merge
-                newBlock = new MemoryInterval(
-                    _reservedIntervals[newIndex - 1].Offset,
-                    newBlock.Length + _reservedIntervals[newIndex - 1].Length);
-                _reservedIntervals.RemoveRange(newIndex - 1, 2);
-                _reservedIntervals.Insert(newIndex - 1, newBlock);
-            }
-        }
 
-        private bool TryReserveWithin(
-            MemoryInterval interval,
-            int length,
-            out MemoryInterval outputInterval)
-        {
-            using (new TimeoutLock(_lock))
+            private MemoryInterval? TryFindFreeIntervalWithin(MemoryInterval interval, int length)
             {
                 foreach (var availableInterval in EnumerateAvailableIntervals())
                 {
@@ -287,35 +223,160 @@ namespace KustoPreForgeLib.Memory
 
                     if (clippedAvailableInterval.Length >= length)
                     {
-                        outputInterval = new MemoryInterval(clippedAvailableInterval.Offset, length);
-                        Reserve(outputInterval);
-
-                        return true;
+                        return new MemoryInterval(clippedAvailableInterval.Offset, length);
                     }
                 }
 
-                outputInterval = new MemoryInterval();
+                return null;
+            }
 
-                return false;
+            /// <summary>This gives the inverse of reservations into the available intervals.</summary>
+            /// <returns></returns>
+            private IEnumerable<MemoryInterval> EnumerateAvailableIntervals()
+            {
+                var start = 0;
+
+                foreach (var reservation in ReservedIntervals)
+                {
+                    if (reservation.Offset != start)
+                    {
+                        yield return new MemoryInterval(start, reservation.Offset - start);
+                    }
+                    start = reservation.End;
+                }
+
+                yield return new MemoryInterval(start, int.MaxValue - start);
+            }
+        }
+        #endregion
+
+        private volatile InternalState _internalState = new InternalState(
+            ImmutableArray<MemoryInterval>.Empty,
+            ImmutableArray<PreReservation>.Empty);
+
+        #region Reservation
+        public void Reserve(MemoryInterval interval)
+        {
+            if (!TryReplaceState(snapshot => snapshot.TryReserve(interval)))
+            {
+                throw new InvalidOperationException("Interval isn't available to reserve");
             }
         }
 
-        /// <summary>This gives the inverse of reservations into the available intervals.</summary>
-        /// <returns></returns>
-        private IEnumerable<MemoryInterval> EnumerateAvailableIntervals()
+        public Task ReserveAsync(MemoryInterval interval)
         {
-            var start = 0;
-
-            foreach (var reservation in _reservedIntervals)
+            if (TryReplaceState(snapshot => snapshot.TryReserve(interval)))
             {
-                if (reservation.Offset != start)
-                {
-                    yield return new MemoryInterval(start, reservation.Offset - start);
-                }
-                start = reservation.End;
+                return Task.CompletedTask;
             }
+            else
+            {
+                var source = new TaskCompletionSource<MemoryInterval>();
+                var preReservation = new PreReservation(interval, null, source);
 
-            yield return new MemoryInterval(start, int.MaxValue - start);
+                ReplaceState(snapshot => new InternalState(
+                    snapshot.ReservedIntervals,
+                    snapshot.PreReservations.Add(preReservation)));
+
+                return source.Task;
+            }
+        }
+
+        /// <summary>Reserves a length of memory within an interval.</summary>>
+        /// <param name="interval">Interval to look within.</param>
+        /// <param name="length">Length of memory to reserve.</param>
+        /// <returns></returns>
+        public Task<MemoryInterval> ReserveWithinAsync(
+            MemoryInterval interval,
+            int length,
+            CancellationToken ct = default(CancellationToken))
+        {
+            var snapshot = _internalState;
+            var newState = snapshot.TryReserveWithin(
+                interval,
+                length,
+                out var outputSubInterval);
+
+            if (newState != null)
+            {
+                if (TryReplaceState(snapshot, newState))
+                {
+                    return Task.FromResult(outputSubInterval);
+                }
+                else
+                {   //  Retry
+                    return ReserveWithinAsync(interval, length, ct);
+                }
+            }
+            else
+            {
+                var source = new TaskCompletionSource<MemoryInterval>();
+                var task = AwaitTaskWithCancellationAsync(source.Task, ct);
+                var preReservation = new PreReservation(interval, length, source);
+
+                ReplaceState(snapshot => new InternalState(
+                    snapshot.ReservedIntervals,
+                    snapshot.PreReservations.Add(preReservation)));
+
+                return task;
+            }
+        }
+        #endregion
+
+        public void Release(MemoryInterval interval)
+        {
+            ReplaceState(snapshot => snapshot.Release(interval));
+            RaiseTracking();
+        }
+
+        private void RaiseTracking()
+        {
+            var snapshot = _internalState;
+
+            for (int i = 0; i != snapshot.PreReservations.Length; ++i)
+            {
+                var preReservation = snapshot.PreReservations[i];
+
+                if (preReservation.length == null)
+                {   //  Reservation of a specific interval
+                    var newState = snapshot.TryReserve(preReservation.interval);
+
+                    if (newState != null)
+                    {
+                        var newPreReservations = snapshot.PreReservations.RemoveAt(i);
+
+                        newState =
+                            new InternalState(newState.ReservedIntervals, newPreReservations);
+                        if (TryReplaceState(snapshot, newState))
+                        {
+                            preReservation.source.SetResult(preReservation.interval);
+                        }
+                        //  Recursive call ; either to retry or to continue
+                        RaiseTracking();
+                    }
+                }
+                else
+                {   //  Reservation within an interval
+                    var newState = snapshot.TryReserveWithin(
+                        preReservation.interval,
+                        preReservation.length.Value,
+                        out var outputSubInterval);
+
+                    if (newState != null)
+                    {
+                        var newPreReservations = snapshot.PreReservations.RemoveAt(i);
+
+                        newState =
+                            new InternalState(newState.ReservedIntervals, newPreReservations);
+                        if (TryReplaceState(snapshot, newState))
+                        {
+                            preReservation.source.SetResult(outputSubInterval);
+                        }
+                        //  Recursive call ; either to retry or to continue
+                        RaiseTracking();
+                    }
+                }
+            }
         }
 
         private static async Task<MemoryInterval> AwaitTaskWithCancellationAsync(
@@ -328,5 +389,52 @@ namespace KustoPreForgeLib.Memory
 
             return await task;
         }
+
+        #region State management
+        private bool ReplaceState(Func<InternalState, InternalState> stateTransition)
+        {
+            var snapshot = _internalState;
+            var newState = stateTransition(snapshot);
+
+            if (TryReplaceState(snapshot, newState))
+            {
+                return true;
+            }
+            else
+            {   //  Retry
+                return TryReplaceState(stateTransition);
+            }
+        }
+
+        private bool TryReplaceState(Func<InternalState, InternalState?> stateTransition)
+        {
+            var snapshot = _internalState;
+            var newState = stateTransition(snapshot);
+
+            if (newState == null)
+            {
+                return false;
+            }
+            else
+            {
+                if (TryReplaceState(snapshot, newState))
+                {
+                    return true;
+                }
+                else
+                {   //  Retry
+                    return TryReplaceState(stateTransition);
+                }
+            }
+        }
+
+        private bool TryReplaceState(InternalState snapshot, InternalState newState)
+        {
+            var oldState =
+                Interlocked.CompareExchange(ref _internalState, newState, snapshot);
+
+            return object.ReferenceEquals(oldState, snapshot);
+        }
+        #endregion
     }
 }

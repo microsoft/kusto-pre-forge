@@ -139,17 +139,20 @@ namespace KustoPreForgeLib
 
         private void TryScheduleFunction()
         {
-            if (Interlocked.Increment(ref _utilization) <= Capacity
-                && _asyncFunctionQueue.TryDequeue(out var asyncFunction))
+            if (Interlocked.Increment(ref _utilization) <= Capacity)
             {
-                var task = ExecuteTaskAsync(asyncFunction);
+                if (_asyncFunctionQueue.TryDequeue(out var asyncFunction))
+                {
+                    var task = ExecuteTaskAsync(asyncFunction);
 
-                _runningTasks.Enqueue(task);
-
-                return;
+                    _runningTasks.Enqueue(task);
+                }
+                else
+                {
+                    Interlocked.Decrement(ref _utilization);
+                }
             }
-
-            if (Interlocked.Decrement(ref _utilization) < Capacity)
+            else if (Interlocked.Decrement(ref _utilization) < Capacity)
             {
                 TryScheduleFunction();
             }

@@ -33,23 +33,41 @@ namespace KustoPreForgeLib.Transforms
             await foreach (var blobData in _blobSource)
             {   //  Avoid context capture
                 var data = blobData;
+                var blobBufferTask = _buffer.ReserveSubBufferAsync(
+                    (int)blobData.Data.BlobSize,
+                    TransformHelper.CreateCancellationToken());
 
-                if (!workQueue.HasCapacity)
+                //  We try to queue as much work as possible
+                //  When that is not possible we unqueue data as much as possible
+                while (!workQueue.HasCapacity)
                 {
-                    await workQueue.WhenAnyAsync();
-
                     if (dataQueue.TryDequeue(out var contentData))
                     {
                         yield return contentData;
                     }
                     else
                     {
-                        throw new InvalidOperationException(
-                            "There should be data in the data queue at this point");
+                        await workQueue.WhenAnyAsync();
                     }
                 }
-                workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, dataQueue));
+                while (!blobBufferTask.IsCompleted)
+                {
+                    if (dataQueue.TryDequeue(out var contentData))
+                    {
+                        yield return contentData;
+                    }
+                    else
+                    {   //  Every second, we'll check if we should return some data
+                        await Task.WhenAny(
+                            Task.Delay(TimeSpan.FromSeconds(1)),
+                            blobBufferTask);
+                    }
+                }
+
+                var blobBuffer = await blobBufferTask;
+
                 await workQueue.ObserveCompletedAsync();
+                workQueue.QueueWorkItem(() => LoadBlobAsync(blobData, blobBuffer, dataQueue));
             }
             await workQueue.WhenAllAsync();
             while (dataQueue.TryDequeue(out var contentData))
@@ -60,11 +78,9 @@ namespace KustoPreForgeLib.Transforms
 
         private async Task LoadBlobAsync(
             SourceData<BlobData> blobData,
+            BufferFragment blobBuffer,
             ConcurrentQueue<SourceData<BufferFragment>> dataQueue)
         {
-            var blobBuffer = await _buffer.ReserveSubBufferAsync(
-                (int)blobData.Data.BlobSize,
-                TransformHelper.CreateCancellationToken(TimeSpan.FromSeconds(20)));
             var readOptions = new BlobOpenReadOptions(false)
             {
                 BufferSize = blobBuffer.Length
