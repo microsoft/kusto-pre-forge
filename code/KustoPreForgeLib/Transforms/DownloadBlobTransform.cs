@@ -39,7 +39,7 @@ namespace KustoPreForgeLib.Transforms
 
                 //  We try to queue as much work as possible
                 //  When that is not possible we unqueue data as much as possible
-                while (!workQueue.HasCapacity || !blobBufferTask.IsCompleted)
+                while (!workQueue.HasCapacity)
                 {
                     if (dataQueue.TryDequeue(out var contentData))
                     {
@@ -47,11 +47,20 @@ namespace KustoPreForgeLib.Transforms
                     }
                     else
                     {
+                        await workQueue.WhenAnyAsync();
+                    }
+                }
+                while (!blobBufferTask.IsCompleted)
+                {
+                    if (dataQueue.TryDequeue(out var contentData))
+                    {
+                        yield return contentData;
+                    }
+                    else
+                    {   //  Every second, we'll check if we should return some data
                         await Task.WhenAny(
-                            //  We don't want to wait forever, instead prioritizing
-                            //  pumping data out
                             Task.Delay(TimeSpan.FromSeconds(1)),
-                            Task.WhenAll(workQueue.WhenAnyAsync(), blobBufferTask));
+                            blobBufferTask);
                     }
                 }
 
