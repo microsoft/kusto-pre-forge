@@ -25,7 +25,8 @@ namespace KustoPreForgeLib.Transforms
             }
             #endregion
 
-            private readonly WorkQueue _workQueue;
+            private readonly WorkQueue _diskWorkQueue;
+            private readonly WorkQueue _blobWorkQueue;
             private readonly PerfCounterJournal _journal;
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
             private readonly string _tempDirectoryPath;
@@ -35,12 +36,14 @@ namespace KustoPreForgeLib.Transforms
             private int _stagingContainerIndex = 0;
 
             public PartitionsWriter(
-                WorkQueue workQueue,
+                WorkQueue diskWorkQueue,
+                WorkQueue blobWorkQueue,
                 PerfCounterJournal journal,
                 IImmutableList<BlobContainerClient> stagingContainers,
                 string tempDirectoryPath)
             {
-                _workQueue = workQueue;
+                _diskWorkQueue = diskWorkQueue;
+                _blobWorkQueue = blobWorkQueue;
                 _journal = journal;
                 _stagingContainers = stagingContainers;
                 _tempDirectoryPath = tempDirectoryPath;
@@ -73,7 +76,7 @@ namespace KustoPreForgeLib.Transforms
                 var writeCompletion = new TaskCompletionSource();
 
                 context.BlockWriteTasks.Add(writeCompletion.Task);
-                _workQueue.QueueWorkItem(() => WriteBlockAsync(
+                _diskWorkQueue.QueueWorkItem(() => WriteBlockAsync(
                     context,
                     content,
                     GetBlockId(blockIndex),
@@ -87,7 +90,7 @@ namespace KustoPreForgeLib.Transforms
                     //  Avoid capture of variable
                     var partitionContext = context;
 
-                    _workQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
+                    _diskWorkQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
                 }
                 //  Commit all sources
                 await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
@@ -130,7 +133,8 @@ namespace KustoPreForgeLib.Transforms
         }
         #endregion
 
-        private const int MAX_PARALLEL_WRITES = 16;
+        private const int MAX_DISK_PARALLEL_WRITES = 16;
+        private const int MAX_BLOB_PARALLEL_WRITES = 16;
 
         private readonly IDataSource<SinglePartitionContent> _contentSource;
         private readonly IImmutableList<BlobContainerClient> _stagingContainers;
@@ -154,9 +158,11 @@ namespace KustoPreForgeLib.Transforms
 
         async Task ISink.ProcessSourceAsync()
         {
-            var workQueue = new WorkQueue(MAX_PARALLEL_WRITES);
+            var diskWorkQueue = new WorkQueue(MAX_DISK_PARALLEL_WRITES);
+            var blobWorkQueue = new WorkQueue(MAX_BLOB_PARALLEL_WRITES);
             Func<PartitionsWriter> writerFactory = () => new PartitionsWriter(
-                workQueue,
+                diskWorkQueue,
+                blobWorkQueue,
                 _journal,
                 _stagingContainers,
                 _tempDirectoryPath);
@@ -174,13 +180,12 @@ namespace KustoPreForgeLib.Transforms
                     intervalStart = DateTime.Now;
                 }
                 writer.Push(data);
-                if (!workQueue.HasCapacity)
-                {
-                }
-                await workQueue.ObserveCompletedAsync();
+                await diskWorkQueue.ObserveCompletedAsync();
+                await blobWorkQueue.ObserveCompletedAsync();
             }
             writer.Flush();
-            await workQueue.WhenAllAsync();
+            await blobWorkQueue.WhenAllAsync();
+            await diskWorkQueue.WhenAllAsync();
         }
     }
 }
