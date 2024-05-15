@@ -33,6 +33,7 @@ namespace KustoPreForgeLib.Transforms
             private readonly IDictionary<int, PartitionContext> _partitionContextMap =
                 new Dictionary<int, PartitionContext>();
             private readonly List<IAsyncDisposable> _sourceDataList = new();
+            private readonly TaskCompletionSource _flushCompleted = new();
             private int _stagingContainerIndex = 0;
             private volatile int _disposeCountDown;
 
@@ -84,7 +85,7 @@ namespace KustoPreForgeLib.Transforms
                     writeCompletion));
             }
 
-            public void Flush()
+            public Task FlushAsync()
             {
                 _disposeCountDown = _partitionContextMap.Count;
                 foreach (var context in _partitionContextMap.Values)
@@ -94,6 +95,8 @@ namespace KustoPreForgeLib.Transforms
 
                     _diskWorkQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
                 }
+
+                return _flushCompleted.Task;
             }
 
             private static string GetBlockId(int blockIndex)
@@ -134,6 +137,7 @@ namespace KustoPreForgeLib.Transforms
                 {   //  Last one turn the switches off
                     //  Commit all sources
                     await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
+                    _flushCompleted.SetResult();
                 }
             }
         }
@@ -175,13 +179,15 @@ namespace KustoPreForgeLib.Transforms
             var writer = writerFactory();
             var intervalStart = DateTime.Now;
             var lastUnitId = Guid.NewGuid();
+            var lastWriterTask = Task.CompletedTask;
 
             await foreach (var data in _contentSource)
             {
                 if (data.Data.UnitId != lastUnitId
                     && intervalStart + _flushInterval < DateTime.Now)
-                {
-                    writer.Flush();
+                {   //  First wait for the previous flush to complete
+                    await lastWriterTask;
+                    lastWriterTask = writer.FlushAsync();
                     writer = writerFactory();
                     intervalStart = DateTime.Now;
                 }
@@ -189,7 +195,8 @@ namespace KustoPreForgeLib.Transforms
                 await diskWorkQueue.ObserveCompletedAsync();
                 await blobWorkQueue.ObserveCompletedAsync();
             }
-            writer.Flush();
+            await lastWriterTask;
+            await writer.FlushAsync();
             await blobWorkQueue.WhenAllAsync();
             await diskWorkQueue.WhenAllAsync();
         }
