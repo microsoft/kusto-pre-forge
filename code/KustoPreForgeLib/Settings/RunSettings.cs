@@ -107,7 +107,7 @@ namespace KustoPreForgeLib.Settings
                     kustoIngestUri,
                     kustoDb!,
                     kustoTable!,
-                    tempDirectory ?? Path.GetTempPath());
+                    tempDirectory);
             DestinationBlobPrefix = destinationBlobPrefix;
             BlobSettings = blobSettings;
         }

@@ -48,7 +48,7 @@ namespace KustoPreForgeLib.Transforms
                 _blobWorkQueue = blobWorkQueue;
                 _journal = journal;
                 _stagingContainers = stagingContainers;
-                _tempDirectoryPath = tempDirectoryPath;
+                _tempDirectoryPath = Path.Combine(tempDirectoryPath, Guid.NewGuid().ToString());
             }
 
             public void Push(SourceData<SinglePartitionContent> data)
@@ -137,6 +137,7 @@ namespace KustoPreForgeLib.Transforms
                 {   //  Last one turn the switches off
                     //  Commit all sources
                     await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
+                    Directory.Delete(_tempDirectoryPath, true);
                     _flushCompleted.SetResult();
                 }
             }

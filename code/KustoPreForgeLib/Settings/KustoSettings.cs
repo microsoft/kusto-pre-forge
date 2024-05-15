@@ -6,12 +6,12 @@
             Uri kustoIngestUri,
             string kustoDb,
             string kustoTable,
-            string tempDirectory)
+            string? tempDirectory)
         {
             IngestUri = kustoIngestUri;
             Database = kustoDb;
             Table = kustoTable;
-            TempDirectory = tempDirectory;
+            TempDirectory = Path.Combine(tempDirectory ?? Path.GetTempPath(), "kusto-pre-forge");
         }
 
         public Uri IngestUri { get; }
