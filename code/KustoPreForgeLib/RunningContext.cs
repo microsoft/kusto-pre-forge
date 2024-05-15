@@ -34,19 +34,19 @@ namespace KustoPreForgeLib
             var destinationBlobClient = runSettings.DestinationBlobPrefix != null
                 ? new BlockBlobClient(runSettings.DestinationBlobPrefix, credentials)
                 : null;
-            var ingestClient = kustoSettings.IngestUri != null
+            var ingestClient = kustoSettings != null
                 ? KustoIngestFactory.CreateQueuedIngestClient(
                     new KustoConnectionStringBuilder(
                         kustoSettings.IngestUri.ToString())
                     .WithAadAzureTokenCredentialsAuthentication(credentials))
                 : null;
-            var ingestionPropertiesFactory = kustoSettings.IngestUri != null
-                ? () => new KustoQueuedIngestionProperties(kustoSettings.Database!, kustoSettings.Table!)
+            var ingestionPropertiesFactory = kustoSettings != null
+                ? () => new KustoQueuedIngestionProperties(kustoSettings.Database, kustoSettings.Table)
                 {
                     Format = runSettings.BlobSettings.Format
                 }
                 : (Func<KustoQueuedIngestionProperties>?)null;
-            var kustoAdminIngestClient = kustoSettings.IngestUri != null
+            var kustoAdminIngestClient = kustoSettings != null
                 ? KustoClientFactory.CreateCslAdminProvider(
                     new KustoConnectionStringBuilder(
                         kustoSettings.IngestUri.ToString())

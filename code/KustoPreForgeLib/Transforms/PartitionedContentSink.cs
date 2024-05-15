@@ -28,6 +28,7 @@ namespace KustoPreForgeLib.Transforms
             private readonly WorkQueue _workQueue;
             private readonly PerfCounterJournal _journal;
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
+            private readonly string _tempDirectoryPath;
             private readonly IDictionary<int, PartitionContext> _partitionContextMap =
                 new Dictionary<int, PartitionContext>();
             private readonly List<IAsyncDisposable> _sourceDataList = new();
@@ -36,11 +37,13 @@ namespace KustoPreForgeLib.Transforms
             public PartitionsWriter(
                 WorkQueue workQueue,
                 PerfCounterJournal journal,
-                IImmutableList<BlobContainerClient> stagingContainers)
+                IImmutableList<BlobContainerClient> stagingContainers,
+                string tempDirectoryPath)
             {
                 _workQueue = workQueue;
                 _journal = journal;
                 _stagingContainers = stagingContainers;
+                _tempDirectoryPath = tempDirectoryPath;
             }
 
             public void Push(SourceData<SinglePartitionContent> data)
@@ -132,17 +135,20 @@ namespace KustoPreForgeLib.Transforms
         private readonly IDataSource<SinglePartitionContent> _contentSource;
         private readonly IImmutableList<BlobContainerClient> _stagingContainers;
         private readonly TimeSpan _flushInterval;
+        private readonly string _tempDirectoryPath;
         private readonly PerfCounterJournal _journal;
 
         public PartitionedContentSink(
             IDataSource<SinglePartitionContent> contentSource,
             IImmutableList<BlobContainerClient> stagingContainers,
             TimeSpan flushInterval,
+            string tempDirectoryPath,
             PerfCounterJournal journal)
         {
             _contentSource = contentSource;
             _stagingContainers = stagingContainers;
             _flushInterval = flushInterval;
+            _tempDirectoryPath = tempDirectoryPath;
             _journal = journal;
         }
 
@@ -152,7 +158,8 @@ namespace KustoPreForgeLib.Transforms
             Func<PartitionsWriter> writerFactory = () => new PartitionsWriter(
                 workQueue,
                 _journal,
-                _stagingContainers);
+                _stagingContainers,
+                _tempDirectoryPath);
             var writer = writerFactory();
             var intervalStart = DateTime.Now;
             var lastUnitId = Guid.NewGuid();
