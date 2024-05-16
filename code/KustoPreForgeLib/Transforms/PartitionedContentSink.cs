@@ -25,6 +25,7 @@ namespace KustoPreForgeLib.Transforms
             }
             #endregion
 
+            private readonly string _batchId = Guid.NewGuid().ToString();
             private readonly WorkQueue _diskWorkQueue;
             private readonly WorkQueue _blobWorkQueue;
             private readonly PerfCounterJournal _journal;
@@ -48,7 +49,7 @@ namespace KustoPreForgeLib.Transforms
                 _blobWorkQueue = blobWorkQueue;
                 _journal = journal;
                 _stagingContainers = stagingContainers;
-                _tempDirectoryPath = Path.Combine(tempDirectoryPath, Guid.NewGuid().ToString());
+                _tempDirectoryPath = Path.Combine(tempDirectoryPath, _batchId);
             }
 
             public void Push(SourceData<SinglePartitionContent> data)

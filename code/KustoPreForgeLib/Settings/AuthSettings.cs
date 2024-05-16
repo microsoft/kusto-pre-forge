@@ -74,6 +74,9 @@ namespace KustoPreForgeLib.Settings
                 case AuthMode.Secret:
                     return new ClientSecretCredential(TenantId, ApplicationId, Secret);
 
+                case AuthMode.AzCli:
+                    return new AzureCliCredential();
+
                 default:
                     throw new NotSupportedException(
                         $"Auth mode:  '{AuthMode}'");
