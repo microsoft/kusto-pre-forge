@@ -15,13 +15,11 @@ namespace KustoPreForgeLib.Transforms
             #region Inner Types
             private struct PartitionContext
             {
-                public BlockBlobClient Blob;
-
+                public string LocalPath;
+                public Stream WriteFileStream;
+                public BlobClient Blob;
                 public string PartitionValueSample;
-
-                public int BlockCount;
-
-                public List<Task> BlockWriteTasks;
+                public long CummulatedSize;
             }
             #endregion
 
@@ -35,7 +33,7 @@ namespace KustoPreForgeLib.Transforms
                 new Dictionary<int, PartitionContext>();
             private readonly List<IAsyncDisposable> _sourceDataList = new();
             private readonly TaskCompletionSource _flushCompleted = new();
-            private int _stagingContainerIndex = 0;
+            private int _containerIndex = 0;
             private volatile int _disposeCountDown;
 
             public PartitionsWriter(
@@ -52,95 +50,74 @@ namespace KustoPreForgeLib.Transforms
                 _tempDirectoryPath = Path.Combine(tempDirectoryPath, _batchId);
             }
 
-            public void Push(SourceData<SinglePartitionContent> data)
+            public long MaxCummulatedSize { get; private set; }
+
+            public async Task PushAsync(SourceData<SinglePartitionContent> data)
             {
                 var content = data.Data;
+                var localPath =
+                    Path.Combine(_tempDirectoryPath, $"{_batchId}-{content.PartitionId}.txt");
 
                 _sourceDataList.Add(data);
                 if (!_partitionContextMap.ContainsKey(content.PartitionId))
                 {
-                    var container = _stagingContainers[_stagingContainerIndex];
-                    var blob = container.GetBlockBlobClient(Guid.NewGuid().ToString());
                     var newContext = new PartitionContext
                     {
-                        Blob = blob,
+                        LocalPath = localPath,
+                        WriteFileStream = new FileStream(localPath, FileMode.CreateNew),
+                        Blob = _stagingContainers[_containerIndex].GetBlobClient($"{_batchId}-{content.PartitionId}"),
                         PartitionValueSample = content.PartitionValueSample,
-                        BlockCount = 0,
-                        BlockWriteTasks = new List<Task>()
+                        CummulatedSize = 0
                     };
 
-                    _stagingContainerIndex = (_stagingContainerIndex + 1)
-                        % _stagingContainers.Count;
+                    _containerIndex = (_containerIndex + 1) % _stagingContainers.Count;
                     _partitionContextMap[content.PartitionId] = newContext;
                 }
 
                 var context = _partitionContextMap[content.PartitionId];
-                var blockIndex = context.BlockCount++;
-                var writeCompletion = new TaskCompletionSource();
 
-                context.BlockWriteTasks.Add(writeCompletion.Task);
-                _diskWorkQueue.QueueWorkItem(() => WriteBlockAsync(
-                    context,
-                    content,
-                    GetBlockId(blockIndex),
-                    writeCompletion));
+                await context.WriteFileStream.WriteAsync(content.Content.ToMemory());
+                context.CummulatedSize += content.Content.Length;
+                MaxCummulatedSize = Math.Max(MaxCummulatedSize, context.CummulatedSize);
             }
 
             public Task FlushAsync()
             {
-                _disposeCountDown = _partitionContextMap.Count;
-                foreach (var context in _partitionContextMap.Values)
+                if (_partitionContextMap.Any())
                 {
-                    //  Avoid capture of variable
-                    var partitionContext = context;
+                    _disposeCountDown = _partitionContextMap.Count;
+                    foreach (var context in _partitionContextMap.Values)
+                    {
+                        //  Avoid capture of variable
+                        var partitionContext = context;
 
-                    _diskWorkQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
+                        _blobWorkQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
+                    }
+
+                    return _flushCompleted.Task;
                 }
-
-                return _flushCompleted.Task;
-            }
-
-            private static string GetBlockId(int blockIndex)
-            {
-                var blockId = Convert.ToBase64String(
-                    Encoding.UTF8.GetBytes(blockIndex.ToString()));
-
-                return blockId;
-            }
-
-            private async Task WriteBlockAsync(
-                PartitionContext context,
-                SinglePartitionContent content,
-                string blockId,
-                TaskCompletionSource writeCompletion)
-            {
-                using (var stream = content.Content.ToMemoryStream())
+                else
                 {
-                    await context.Blob.StageBlockAsync(blockId, stream);
+                    return Task.CompletedTask;
                 }
-                content.Content.Release();
-                writeCompletion.SetResult();
-                _journal.AddReading(
-                    "PartitionedContentSink.Write.Size",
-                    content.Content.Length);
             }
 
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
             {
-                await Task.WhenAll(partitionContext.BlockWriteTasks);
-
-                var blockIds = Enumerable.Range(0, partitionContext.BlockCount)
-                    .Select(index => GetBlockId(index));
-
-                await partitionContext.Blob.CommitBlockListAsync(blockIds);
+                partitionContext.WriteFileStream.Close();
+                await partitionContext.Blob.UploadAsync(partitionContext.LocalPath);
 
                 if (Interlocked.Decrement(ref _disposeCountDown) == 0)
                 {   //  Last one turn the switches off
-                    //  Commit all sources
-                    await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
-                    Directory.Delete(_tempDirectoryPath, true);
-                    _flushCompleted.SetResult();
+                    await CommitAllSourcesAsync();
                 }
+            }
+
+            private async Task CommitAllSourcesAsync()
+            {
+                await Task.WhenAll(_sourceDataList.Select(d => d.DisposeAsync().AsTask()));
+                Directory.Delete(_tempDirectoryPath, true);
+                _flushCompleted.SetResult();
             }
         }
         #endregion
@@ -151,6 +128,7 @@ namespace KustoPreForgeLib.Transforms
         private readonly IDataSource<SinglePartitionContent> _contentSource;
         private readonly IImmutableList<BlobContainerClient> _stagingContainers;
         private readonly TimeSpan _flushInterval;
+        private readonly long _maxBlobSize;
         private readonly string _tempDirectoryPath;
         private readonly PerfCounterJournal _journal;
 
@@ -158,12 +136,14 @@ namespace KustoPreForgeLib.Transforms
             IDataSource<SinglePartitionContent> contentSource,
             IImmutableList<BlobContainerClient> stagingContainers,
             TimeSpan flushInterval,
+            long maxBlobSize,
             string tempDirectoryPath,
             PerfCounterJournal journal)
         {
             _contentSource = contentSource;
             _stagingContainers = stagingContainers;
             _flushInterval = flushInterval;
+            _maxBlobSize = maxBlobSize;
             _tempDirectoryPath = tempDirectoryPath;
             _journal = journal;
         }
@@ -186,14 +166,15 @@ namespace KustoPreForgeLib.Transforms
             await foreach (var data in _contentSource)
             {
                 if (data.Data.UnitId != lastUnitId
-                    && intervalStart + _flushInterval < DateTime.Now)
+                    && (writer.MaxCummulatedSize >= _maxBlobSize
+                    || intervalStart + _flushInterval < DateTime.Now))
                 {   //  First wait for the previous flush to complete
                     await lastWriterTask;
                     lastWriterTask = writer.FlushAsync();
                     writer = writerFactory();
                     intervalStart = DateTime.Now;
                 }
-                writer.Push(data);
+                await writer.PushAsync(data);
                 await diskWorkQueue.ObserveCompletedAsync();
                 await blobWorkQueue.ObserveCompletedAsync();
             }

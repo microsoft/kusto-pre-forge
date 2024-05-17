@@ -134,6 +134,7 @@ namespace KustoPreForgeLib
                         journal),
                     context.StagingContainers!,
                     TimeSpan.FromMinutes(1),
+                    1000000000,
                     kustoSettings.TempDirectory,
                     journal));
         }
