@@ -14,17 +14,24 @@ namespace KustoPreForgeLib.Transforms
         private class PartitionsWriter
         {
             #region Inner Types
-            private struct PartitionContext
+            private class PartitionContext
             {
+                public PartitionContext(BlockBlobClient blob, string partitionValueSample)
+                {
+                    Blob = blob;
+                    PartitionValueSample = partitionValueSample;
+                }
+
                 public BlockBlobClient Blob;
 
                 public string PartitionValueSample;
 
-                public int BlockCount;
+                public volatile int BlockCount = 0;
 
-                public List<Task> BlockWriteTasks;
+                public List<Task> BlockWriteTasks = new();
 
-                public ConcurrentQueue<BufferFragment> BufferQueue;
+                public ConcurrentQueue<(BufferFragment, TaskCompletionSource)> BufferQueue =
+                    new();
             }
             #endregion
 
@@ -56,14 +63,7 @@ namespace KustoPreForgeLib.Transforms
                 {
                     var container = _stagingContainers[_stagingContainerIndex];
                     var blob = container.GetBlockBlobClient(Guid.NewGuid().ToString());
-                    var newContext = new PartitionContext
-                    {
-                        Blob = blob,
-                        PartitionValueSample = content.PartitionValueSample,
-                        BlockCount = 0,
-                        BlockWriteTasks = new(),
-                        BufferQueue = new()
-                    };
+                    var newContext = new PartitionContext(blob, content.PartitionValueSample);
 
                     _stagingContainerIndex = (_stagingContainerIndex + 1)
                         % _stagingContainers.Count;
@@ -71,15 +71,11 @@ namespace KustoPreForgeLib.Transforms
                 }
 
                 var context = _partitionContextMap[content.PartitionId];
-                var blockIndex = context.BlockCount++;
                 var writeCompletion = new TaskCompletionSource();
 
                 context.BlockWriteTasks.Add(writeCompletion.Task);
-                context.BufferQueue.Enqueue(content.Content);
-                _workQueue.QueueWorkItem(() => WriteBlockAsync(
-                    context,
-                    GetBlockId(blockIndex),
-                    writeCompletion));
+                context.BufferQueue.Enqueue((content.Content, writeCompletion));
+                _workQueue.QueueWorkItem(() => WriteBlockAsync(context));
             }
 
             public void Flush()
@@ -102,24 +98,33 @@ namespace KustoPreForgeLib.Transforms
                 return blockId;
             }
 
-            private async Task WriteBlockAsync(
-                PartitionContext context,
-                string blockId,
-                TaskCompletionSource writeCompletion)
+            private async Task WriteBlockAsync(PartitionContext context)
             {
-                if (context.BufferQueue.TryDequeue(out var fragment))
+                var bufferList = new List<BufferFragment>();
+                var sourceList = new List<TaskCompletionSource>();
+
+                while (context.BufferQueue.TryDequeue(out var pair))
                 {
-                    if (context.BufferQueue.Count > 0)
-                    {
-                        Console.WriteLine("Merge Potential!!!");
-                    }
-                    using (var stream = fragment.ToMemoryStream())
+                    bufferList.Add(pair.Item1);
+                    sourceList.Add(pair.Item2);
+                }
+                if (bufferList.Any())
+                {
+                    var blockId = GetBlockId(Interlocked.Increment(ref context.BlockCount) - 1);
+
+                    using (var stream = new MultiBufferStream(bufferList))
                     {
                         await context.Blob.StageBlockAsync(blockId, stream);
                     }
-                    writeCompletion.SetResult();
-                    fragment.Release();
-                    _journal.AddReading("PartitionedContentSink.Write.Size", fragment.Length);
+                    foreach (var buffer in bufferList)
+                    {
+                        _journal.AddReading("PartitionedContentSink.Write.Size", buffer.Length);
+                        buffer.Release();
+                    }
+                    foreach (var source in sourceList)
+                    {
+                        source.SetResult();
+                    }
                 }
             }
 
@@ -141,7 +146,7 @@ namespace KustoPreForgeLib.Transforms
         }
         #endregion
 
-        private const int MAX_PARALLEL_WRITES = 32;
+        private const int MAX_PARALLEL_WRITES = 16;
 
         private readonly IDataSource<SinglePartitionContent> _contentSource;
         private readonly IImmutableList<BlobContainerClient> _stagingContainers;
