@@ -2,6 +2,7 @@
 using Azure.Storage.Blobs.Specialized;
 using Kusto.Cloud.Platform.Utils;
 using KustoPreForgeLib.Memory;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text;
 
@@ -22,6 +23,8 @@ namespace KustoPreForgeLib.Transforms
                 public int BlockCount;
 
                 public List<Task> BlockWriteTasks;
+
+                public ConcurrentQueue<BufferFragment> BufferQueue;
             }
             #endregion
 
@@ -58,7 +61,8 @@ namespace KustoPreForgeLib.Transforms
                         Blob = blob,
                         PartitionValueSample = content.PartitionValueSample,
                         BlockCount = 0,
-                        BlockWriteTasks = new List<Task>()
+                        BlockWriteTasks = new(),
+                        BufferQueue = new()
                     };
 
                     _stagingContainerIndex = (_stagingContainerIndex + 1)
@@ -71,9 +75,9 @@ namespace KustoPreForgeLib.Transforms
                 var writeCompletion = new TaskCompletionSource();
 
                 context.BlockWriteTasks.Add(writeCompletion.Task);
+                context.BufferQueue.Enqueue(content.Content);
                 _workQueue.QueueWorkItem(() => WriteBlockAsync(
                     context,
-                    content,
                     GetBlockId(blockIndex),
                     writeCompletion));
             }
@@ -100,19 +104,23 @@ namespace KustoPreForgeLib.Transforms
 
             private async Task WriteBlockAsync(
                 PartitionContext context,
-                SinglePartitionContent content,
                 string blockId,
                 TaskCompletionSource writeCompletion)
             {
-                using (var stream = content.Content.ToMemoryStream())
+                if (context.BufferQueue.TryDequeue(out var fragment))
                 {
-                    await context.Blob.StageBlockAsync(blockId, stream);
+                    if (context.BufferQueue.Count > 0)
+                    {
+                        Console.WriteLine("Merge Potential!!!");
+                    }
+                    using (var stream = fragment.ToMemoryStream())
+                    {
+                        await context.Blob.StageBlockAsync(blockId, stream);
+                    }
+                    writeCompletion.SetResult();
+                    fragment.Release();
+                    _journal.AddReading("PartitionedContentSink.Write.Size", fragment.Length);
                 }
-                content.Content.Release();
-                writeCompletion.SetResult();
-                _journal.AddReading(
-                    "PartitionedContentSink.Write.Size",
-                    content.Content.Length);
             }
 
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
