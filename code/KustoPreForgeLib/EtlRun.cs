@@ -35,6 +35,7 @@ namespace KustoPreForgeLib
             var stopwatch = new Stopwatch();
 
             stopwatch.Start();
+            EnsureDirectory(runSettings.KustoSettings?.TempDirectory);
 
             var etl = await CreateEtlAsync(runSettings, blobSource, context, journal);
 
@@ -42,6 +43,18 @@ namespace KustoPreForgeLib
             await journal.StopReportingAsync();
 
             Console.WriteLine($"ETL completed in {stopwatch.Elapsed}");
+        }
+
+        private static void EnsureDirectory(string? tempDirectory)
+        {
+            if (tempDirectory != null)
+            {
+                if (!Directory.Exists(tempDirectory))
+                {
+                    EnsureDirectory(Directory.GetParent(tempDirectory)?.FullName);
+                    Directory.CreateDirectory(tempDirectory);
+                }
+            }
         }
 
         private static async Task<IEtl> CreateEtlAsync(
@@ -150,8 +163,8 @@ namespace KustoPreForgeLib
             }
             var policyReaderTask = context.AdminEngineClient!.ExecuteControlCommandAsync(
                 kustoSettings.Database!,
-                @"
-.show table Logs policy partitioning
+                @$"
+.show table {kustoSettings.Table} policy partitioning
 | project Keys=todynamic(Policy).PartitionKeys
 | mv-expand Keys
 | where Keys.Kind==""Hash""
@@ -161,8 +174,8 @@ namespace KustoPreForgeLib
     Seed = toint(Keys.Properties.Seed)");
             var tableReader = await context.AdminEngineClient!.ExecuteControlCommandAsync(
                 kustoSettings.Database!,
-                @"
-.show table Logs
+                @$"
+.show table {kustoSettings.Table}
 | project AttributeName");
             var policyReader = await policyReaderTask;
             var policyRow = policyReader.ToDataSet().Tables[0].Rows[0];

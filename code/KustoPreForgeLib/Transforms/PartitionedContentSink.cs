@@ -13,8 +13,22 @@ namespace KustoPreForgeLib.Transforms
         private class PartitionsWriter
         {
             #region Inner Types
-            private struct PartitionContext
+            private class PartitionContext
             {
+                public PartitionContext(
+                    string localPath,
+                    Stream writeFileStream,
+                    BlobClient blob,
+                    string partitionValueSample,
+                    long cummulatedSize)
+                {
+                    LocalPath = localPath;
+                    WriteFileStream = writeFileStream;
+                    Blob = blob;
+                    PartitionValueSample = partitionValueSample;
+                    CummulatedSize = cummulatedSize;
+                }
+
                 public string LocalPath;
                 public Stream WriteFileStream;
                 public BlobClient Blob;
@@ -48,6 +62,7 @@ namespace KustoPreForgeLib.Transforms
                 _journal = journal;
                 _stagingContainers = stagingContainers;
                 _tempDirectoryPath = Path.Combine(tempDirectoryPath, _batchId);
+                Directory.CreateDirectory(_tempDirectoryPath);
             }
 
             public long MaxCummulatedSize { get; private set; }
@@ -61,14 +76,14 @@ namespace KustoPreForgeLib.Transforms
                 _sourceDataList.Add(data);
                 if (!_partitionContextMap.ContainsKey(content.PartitionId))
                 {
-                    var newContext = new PartitionContext
-                    {
-                        LocalPath = localPath,
-                        WriteFileStream = new FileStream(localPath, FileMode.CreateNew),
-                        Blob = _stagingContainers[_containerIndex].GetBlobClient($"{_batchId}-{content.PartitionId}"),
-                        PartitionValueSample = content.PartitionValueSample,
-                        CummulatedSize = 0
-                    };
+                    var blob = _stagingContainers[_containerIndex]
+                        .GetBlobClient($"{_batchId}-{content.PartitionId}");
+                    var newContext = new PartitionContext(
+                        localPath,
+                        new FileStream(localPath, FileMode.CreateNew),
+                        blob,
+                        content.PartitionValueSample,
+                        0);
 
                     _containerIndex = (_containerIndex + 1) % _stagingContainers.Count;
                     _partitionContextMap[content.PartitionId] = newContext;
@@ -106,6 +121,7 @@ namespace KustoPreForgeLib.Transforms
             {
                 partitionContext.WriteFileStream.Close();
                 await partitionContext.Blob.UploadAsync(partitionContext.LocalPath);
+                _journal.AddReading("Blob.Size", partitionContext.CummulatedSize);
 
                 if (Interlocked.Decrement(ref _disposeCountDown) == 0)
                 {   //  Last one turn the switches off
