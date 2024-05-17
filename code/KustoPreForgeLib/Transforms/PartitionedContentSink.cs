@@ -141,7 +141,7 @@ namespace KustoPreForgeLib.Transforms
         }
         #endregion
 
-        private const int MAX_PARALLEL_WRITES = 16;
+        private const int MAX_PARALLEL_WRITES = 32;
 
         private readonly IDataSource<SinglePartitionContent> _contentSource;
         private readonly IImmutableList<BlobContainerClient> _stagingContainers;
