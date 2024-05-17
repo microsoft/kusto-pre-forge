@@ -19,14 +19,12 @@ namespace KustoPreForgeLib.Transforms
                     string localPath,
                     Stream writeFileStream,
                     BlobClient blob,
-                    string partitionValueSample,
-                    long cummulatedSize)
+                    string partitionValueSample)
                 {
                     LocalPath = localPath;
                     WriteFileStream = writeFileStream;
                     Blob = blob;
                     PartitionValueSample = partitionValueSample;
-                    CummulatedSize = cummulatedSize;
                 }
 
                 public string LocalPath;
@@ -34,11 +32,13 @@ namespace KustoPreForgeLib.Transforms
                 public BlobClient Blob;
                 public string PartitionValueSample;
                 public long CummulatedSize;
+                public Task LastWriteOperation = Task.CompletedTask;
             }
             #endregion
 
             private readonly string _batchId = Guid.NewGuid().ToString();
-            private readonly WorkQueue _workQueue;
+            private readonly WorkQueue _diskWorkQueue;
+            private readonly WorkQueue _blobWorkQueue;
             private readonly PerfCounterJournal _journal;
             private readonly IImmutableList<BlobContainerClient> _stagingContainers;
             private readonly string _tempDirectoryPath;
@@ -50,12 +50,14 @@ namespace KustoPreForgeLib.Transforms
             private volatile int _disposeCountDown;
 
             public PartitionsWriter(
-                WorkQueue workQueue,
+                WorkQueue diskWorkQueue,
+                WorkQueue blobWorkQueue,
                 PerfCounterJournal journal,
                 IImmutableList<BlobContainerClient> stagingContainers,
                 string tempDirectoryPath)
             {
-                _workQueue = workQueue;
+                _diskWorkQueue = diskWorkQueue;
+                _blobWorkQueue = blobWorkQueue;
                 _journal = journal;
                 _stagingContainers = stagingContainers;
                 _tempDirectoryPath = Path.Combine(tempDirectoryPath, _batchId);
@@ -64,7 +66,7 @@ namespace KustoPreForgeLib.Transforms
 
             public long MaxCummulatedSize { get; private set; }
 
-            public async Task PushAsync(SourceData<SinglePartitionContent> data)
+            public void Push(SourceData<SinglePartitionContent> data)
             {
                 var content = data.Data;
                 var localPath =
@@ -77,21 +79,29 @@ namespace KustoPreForgeLib.Transforms
                         .GetBlobClient($"{_batchId}-{content.PartitionId}");
                     var newContext = new PartitionContext(
                         localPath,
-                        new FileStream(localPath, FileMode.CreateNew),
+                        new FileStream(localPath, new FileStreamOptions
+                        {   //  We do not want extra buffering since we manage buffer already
+                            BufferSize = 0,
+                            Access = FileAccess.Write,
+                            Mode = FileMode.CreateNew
+                        }),
                         blob,
-                        content.PartitionValueSample,
-                        0);
+                        content.PartitionValueSample);
 
                     _containerIndex = (_containerIndex + 1) % _stagingContainers.Count;
                     _partitionContextMap[content.PartitionId] = newContext;
                 }
 
                 var context = _partitionContextMap[content.PartitionId];
+                var source = new TaskCompletionSource();
+                var lastWriteOperation = context.LastWriteOperation;
 
-                await context.WriteFileStream.WriteAsync(content.Content.ToMemory());
-                content.Content.Release();
                 context.CummulatedSize += content.Content.Length;
                 MaxCummulatedSize = Math.Max(MaxCummulatedSize, context.CummulatedSize);
+                _diskWorkQueue.QueueWorkItem(() => PushToDiskAsync(
+                    context,
+                    lastWriteOperation,
+                    content.Content));
             }
 
             public Task FlushAsync()
@@ -104,7 +114,7 @@ namespace KustoPreForgeLib.Transforms
                         //  Avoid capture of variable
                         var partitionContext = context;
 
-                        _workQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
+                        _blobWorkQueue.QueueWorkItem(() => FlushPartitionAsync(partitionContext));
                     }
 
                     return _flushCompleted.Task;
@@ -113,6 +123,16 @@ namespace KustoPreForgeLib.Transforms
                 {
                     return Task.CompletedTask;
                 }
+            }
+
+            private static async Task PushToDiskAsync(
+                PartitionContext context,
+                Task lastWriteOperation,
+                BufferFragment content)
+            {
+                await lastWriteOperation;
+                await context.WriteFileStream.WriteAsync(content.ToMemory());
+                content.Release();
             }
 
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
@@ -164,9 +184,11 @@ namespace KustoPreForgeLib.Transforms
 
         async Task ISink.ProcessSourceAsync()
         {
-            var workQueue = new WorkQueue(MAX_BLOB_PARALLEL_WRITES);
+            var diskWorkQueue = new WorkQueue(MAX_BLOB_PARALLEL_WRITES);
+            var blobWorkQueue = new WorkQueue(MAX_BLOB_PARALLEL_WRITES);
             Func<PartitionsWriter> writerFactory = () => new PartitionsWriter(
-                workQueue,
+                diskWorkQueue,
+                blobWorkQueue,
                 _journal,
                 _stagingContainers,
                 _tempDirectoryPath);
@@ -183,15 +205,17 @@ namespace KustoPreForgeLib.Transforms
                 {   //  First wait for the previous flush to complete
                     await lastWriterTask;
                     lastWriterTask = writer.FlushAsync();
+                    await diskWorkQueue.ObserveCompletedAsync();
+                    await blobWorkQueue.ObserveCompletedAsync();
                     writer = writerFactory();
                     intervalStart = DateTime.Now;
                 }
-                await writer.PushAsync(data);
-                await workQueue.ObserveCompletedAsync();
+                writer.Push(data);
             }
             await lastWriterTask;
             await writer.FlushAsync();
-            await workQueue.WhenAllAsync();
+            await diskWorkQueue.WhenAllAsync();
+            await blobWorkQueue.WhenAllAsync();
         }
     }
 }
