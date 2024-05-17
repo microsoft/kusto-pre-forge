@@ -16,7 +16,7 @@ namespace KustoPreForgeLib.Settings
 
         public SourceSettings SourceSettings { get; }
 
-        public KustoSettings KustoSettings { get; }
+        public KustoSettings? KustoSettings { get; }
 
         public Uri? DestinationBlobPrefix { get; }
 
@@ -45,6 +45,7 @@ namespace KustoPreForgeLib.Settings
             var outputCompression = GetEnum<DataSourceCompressionType>("OutputCompression", false);
             var hasHeaders = GetBool("CsvHeaders", false);
             var maxMbPerShard = GetInt("MaxMbPerShard", false);
+            var tempDirectory = GetString("TempDirectory", false);
 
             return new RunSettings(
                 eltAction,
@@ -68,7 +69,8 @@ namespace KustoPreForgeLib.Settings
                     inputCompression,
                     outputCompression,
                     hasHeaders,
-                    maxMbPerShard));
+                    maxMbPerShard),
+                tempDirectory);
         }
 
         public RunSettings(
@@ -79,7 +81,8 @@ namespace KustoPreForgeLib.Settings
             string? kustoDb,
             string? kustoTable,
             Uri? destinationBlobPrefix,
-            BlobSettings blobSettings)
+            BlobSettings blobSettings,
+            string? tempDirectory)
         {
             if (kustoIngestUri != null)
             {
@@ -98,10 +101,13 @@ namespace KustoPreForgeLib.Settings
             Action = action ?? EtlAction.Split;
             AuthSettings = authSettings;
             SourceSettings = sourceSettings;
-            KustoSettings = new KustoSettings(
-                kustoIngestUri,
-                kustoDb,
-                kustoTable);
+            KustoSettings = kustoIngestUri == null
+                ? null
+                : new KustoSettings(
+                    kustoIngestUri,
+                    kustoDb!,
+                    kustoTable!,
+                    tempDirectory);
             DestinationBlobPrefix = destinationBlobPrefix;
             BlobSettings = blobSettings;
         }
@@ -258,7 +264,7 @@ namespace KustoPreForgeLib.Settings
             AuthSettings.WriteOutSettings();
             SourceSettings.WriteOutSettings();
             Console.WriteLine($"DestinationBlobPrefix:  {DestinationBlobPrefix}");
-            KustoSettings.WriteOutSettings();
+            KustoSettings?.WriteOutSettings();
             BlobSettings.WriteOutSettings();
             Console.WriteLine();
             Console.WriteLine($"Core count:  {Environment.ProcessorCount}");
