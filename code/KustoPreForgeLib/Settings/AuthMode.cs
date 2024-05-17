@@ -4,6 +4,7 @@
     {
         Default,
         ManagedIdentity,
-        Secret
+        Secret,
+        AzCli
     }
 }
