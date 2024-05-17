@@ -148,8 +148,8 @@ namespace KustoPreForgeLib
             }
             var policyReaderTask = context.AdminEngineClient!.ExecuteControlCommandAsync(
                 kustoSettings.Database!,
-                @"
-.show table Logs policy partitioning
+                @$"
+.show table {kustoSettings.Table} policy partitioning
 | project Keys=todynamic(Policy).PartitionKeys
 | mv-expand Keys
 | where Keys.Kind==""Hash""
@@ -159,8 +159,8 @@ namespace KustoPreForgeLib
     Seed = toint(Keys.Properties.Seed)");
             var tableReader = await context.AdminEngineClient!.ExecuteControlCommandAsync(
                 kustoSettings.Database!,
-                @"
-.show table Logs
+                @$"
+.show table {kustoSettings.Table}
 | project AttributeName");
             var policyReader = await policyReaderTask;
             var policyRow = policyReader.ToDataSet().Tables[0].Rows[0];
