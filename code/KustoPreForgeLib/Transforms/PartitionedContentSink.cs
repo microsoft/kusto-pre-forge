@@ -138,7 +138,7 @@ namespace KustoPreForgeLib.Transforms
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
             {
                 partitionContext.WriteFileStream.Close();
-                await partitionContext.Blob.UploadAsync(partitionContext.LocalPath);
+                //await partitionContext.Blob.UploadAsync(partitionContext.LocalPath);
                 _journal.AddReading("Blob.Size", partitionContext.CummulatedSize);
 
                 if (Interlocked.Decrement(ref _disposeCountDown) == 0)
