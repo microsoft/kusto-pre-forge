@@ -89,6 +89,7 @@ namespace KustoPreForgeLib.Transforms
                 var context = _partitionContextMap[content.PartitionId];
 
                 await context.WriteFileStream.WriteAsync(content.Content.ToMemory());
+                content.Content.Release();
                 context.CummulatedSize += content.Content.Length;
                 MaxCummulatedSize = Math.Max(MaxCummulatedSize, context.CummulatedSize);
             }
