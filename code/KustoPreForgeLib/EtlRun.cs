@@ -57,7 +57,7 @@ namespace KustoPreForgeLib
                 case EtlAction.PrePartition:
                     return await CreatePrePartitionEtlAsync(
                         blobSource,
-                        runSettings.KustoSettings,
+                        runSettings.KustoSettings!,
                         context,
                         journal);
 
