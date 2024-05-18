@@ -1,5 +1,4 @@
 ﻿using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Specialized;
 using Kusto.Cloud.Platform.Utils;
 using KustoPreForgeLib.Memory;
 using System.Collections.Concurrent;
@@ -16,19 +15,21 @@ namespace KustoPreForgeLib.Transforms
             #region Inner Types
             private class PartitionContext
             {
-                public PartitionContext(BlockBlobClient blob, string partitionValueSample)
+                public PartitionContext(BlobClient blob, string partitionValueSample)
                 {
                     Blob = blob;
                     PartitionValueSample = partitionValueSample;
                 }
 
-                public BlockBlobClient Blob;
+                public BlobClient Blob;
+
+                public Stream? BlobStream = null;
 
                 public string PartitionValueSample;
 
-                public volatile int BlockCount = 0;
+                public volatile Task StreamingTask = Task.CompletedTask;
 
-                public List<Task> BlockWriteTasks = new();
+                public List<Task> WritingTasks = new();
 
                 public ConcurrentQueue<(BufferFragment, TaskCompletionSource)> BufferQueue =
                     new();
@@ -62,7 +63,7 @@ namespace KustoPreForgeLib.Transforms
                 if (!_partitionContextMap.ContainsKey(content.PartitionId))
                 {
                     var container = _stagingContainers[_stagingContainerIndex];
-                    var blob = container.GetBlockBlobClient(Guid.NewGuid().ToString());
+                    var blob = container.GetBlobClient(Guid.NewGuid().ToString());
                     var newContext = new PartitionContext(blob, content.PartitionValueSample);
 
                     _stagingContainerIndex = (_stagingContainerIndex + 1)
@@ -73,7 +74,7 @@ namespace KustoPreForgeLib.Transforms
                 var context = _partitionContextMap[content.PartitionId];
                 var writeCompletion = new TaskCompletionSource();
 
-                context.BlockWriteTasks.Add(writeCompletion.Task);
+                context.WritingTasks.Add(writeCompletion.Task);
                 context.BufferQueue.Enqueue((content.Content, writeCompletion));
                 _workQueue.QueueWorkItem(() => WriteBlockAsync(context));
             }
@@ -90,52 +91,49 @@ namespace KustoPreForgeLib.Transforms
                 }
             }
 
-            private static string GetBlockId(int blockIndex)
-            {
-                var blockId = Convert.ToBase64String(
-                    Encoding.UTF8.GetBytes(blockIndex.ToString()));
-
-                return blockId;
-            }
-
             private async Task WriteBlockAsync(PartitionContext context)
             {
-                var bufferList = new List<BufferFragment>();
-                var sourceList = new List<TaskCompletionSource>();
+                var oldStreamingTask = context.StreamingTask;
 
-                while (context.BufferQueue.TryDequeue(out var pair))
+                if (oldStreamingTask.IsCompleted)
                 {
-                    bufferList.Add(pair.Item1);
-                    sourceList.Add(pair.Item2);
-                }
-                if (bufferList.Any())
-                {
-                    var blockId = GetBlockId(Interlocked.Increment(ref context.BlockCount) - 1);
+                    var newStreamingSource = new TaskCompletionSource();
+                    var confirmedOldStreamingTask = Interlocked.CompareExchange(
+                        ref context.StreamingTask,
+                        newStreamingSource.Task,
+                        oldStreamingTask);
 
-                    using (var stream = new MultiBufferStream(bufferList))
+                    if (object.ReferenceEquals(confirmedOldStreamingTask, oldStreamingTask))
                     {
-                        await context.Blob.StageBlockAsync(blockId, stream);
-                    }
-                    foreach (var buffer in bufferList)
-                    {
-                        _journal.AddReading("PartitionedContentSink.Write.Size", buffer.Length);
-                        buffer.Release();
-                    }
-                    foreach (var source in sourceList)
-                    {
-                        source.SetResult();
+                        if (context.BlobStream == null)
+                        {
+                            context.BlobStream = await context.Blob.OpenWriteAsync(true);
+                        }
+                        while (context.BufferQueue.TryDequeue(out var pair))
+                        {
+                            var buffer = pair.Item1;
+                            var bufferSource = pair.Item2;
+
+                            await context.BlobStream.WriteAsync(buffer.ToMemory());
+                            bufferSource.SetResult();
+                            _journal.AddReading("PartitionedContentSink.Write.Size", buffer.Length);
+                            buffer.Release();
+                        }
+                        //  Release the "lock" on writing
+                        newStreamingSource.SetResult();
+                        if (context.BufferQueue.Any())
+                        {   //  Make sure we didn't hit a racing condition and left items in queue
+                            await WriteBlockAsync(context);
+                        }
                     }
                 }
             }
 
             private async Task FlushPartitionAsync(PartitionContext partitionContext)
             {
-                await Task.WhenAll(partitionContext.BlockWriteTasks);
+                await Task.WhenAll(partitionContext.WritingTasks);
 
-                var blockIds = Enumerable.Range(0, partitionContext.BlockCount)
-                    .Select(index => GetBlockId(index));
-
-                await partitionContext.Blob.CommitBlockListAsync(blockIds);
+                await partitionContext.BlobStream!.DisposeAsync();
 
                 if (Interlocked.Decrement(ref _disposeCountDown) == 0)
                 {   //  Last one turn the switches off
